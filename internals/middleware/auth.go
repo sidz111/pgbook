@@ -9,42 +9,54 @@ import (
 
 func AuthMiddleware(secret string, roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 1. Cookie madhun token kadha
 		tokenString, err := c.Cookie("access_token")
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 			c.Abort()
 			return
 		}
 
-		// 2. Token Parse kara
-		token, _ := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			return []byte(secret), nil
 		})
 
-		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-			userRole := claims["role"].(string)
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			c.Abort()
+			return
+		}
 
-			// 3. Role Check kara
-			roleAllowed := false
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			c.Abort()
+			return
+		}
+
+		userRole := claims["role"].(string)
+
+		// Role check logic
+		roleAllowed := false
+		if len(roles) == 0 {
+			roleAllowed = true
+		} else {
 			for _, r := range roles {
 				if r == userRole {
 					roleAllowed = true
 					break
 				}
 			}
-
-			if !roleAllowed {
-				c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-				c.Abort()
-				return
-			}
-
-			c.Set("userID", claims["sub"])
-			c.Next()
-		} else {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			c.Abort()
 		}
+
+		if !roleAllowed {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to access this resource"})
+			c.Abort()
+			return
+		}
+
+		c.Set("userID", claims["sub"])
+		c.Set("role", userRole)
+
+		c.Next()
 	}
 }

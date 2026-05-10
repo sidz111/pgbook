@@ -29,23 +29,17 @@ func NewAuthService(repo repositories.UserRepository, secret string) AuthService
 }
 
 func (s *authService) Register(ctx context.Context, user *models.User) error {
-	// 1. Check if email already exists
 	if s.userRepo.EmailExists(ctx, user.Email) {
 		return errors.New("email already registered")
 	}
-
-	// 2. Hash Password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 	user.Password = string(hashedPassword)
-
-	// 3. Save to DB
 	return s.userRepo.CreateUser(ctx, user)
 }
 
-// Login: Verify credentials aani Access/Refresh token dene
 func (s *authService) Login(ctx context.Context, email, password string) (string, string, *models.User, error) {
 	user, err := s.userRepo.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -56,13 +50,7 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 		return "", "", nil, errors.New("invalid credentials")
 	}
 
-	// Access Token (15 Minutes)
 	accessToken, err := s.generateToken(user.ID.String(), user.Role, time.Minute*15)
-	if err != nil {
-		return "", "", nil, err
-	}
-
-	// Refresh Token (7 Days)
 	refreshToken, err := s.generateToken(user.ID.String(), user.Role, time.Hour*24*7)
 	if err != nil {
 		return "", "", nil, err
@@ -77,7 +65,6 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 }
 
 func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (string, error) {
-	// 1. Token Parse and Verify
 	token, err := jwt.Parse(refreshToken, func(t *jwt.Token) (interface{}, error) {
 		return []byte(s.secret), nil
 	})
@@ -86,45 +73,34 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (st
 		return "", errors.New("invalid refresh token")
 	}
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return "", errors.New("invalid token claims")
-	}
-
+	claims := token.Claims.(jwt.MapClaims)
 	userIDStr := claims["sub"].(string)
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		return "", errors.New("invalid user id in token")
 	}
 
-	// 2. check in db if token matches with the one stored for the user
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil || user.RefreshToken != refreshToken {
 		return "", errors.New("token mismatch or user not found")
 	}
 
-	// 3. New access token (15 mins)
-	newAccessToken, err := s.generateToken(user.ID.String(), user.Role, time.Minute*15)
-	return newAccessToken, err
+	return s.generateToken(user.ID.String(), user.Role, time.Minute*15)
 }
 
-// Logout: creare token from DB and clear cookie from client side
 func (s *authService) Logout(ctx context.Context, userID string) error {
 	uID, err := uuid.Parse(userID)
 	if err != nil {
-		return errors.New("invalid user id")
+		return err
 	}
-
 	user, err := s.userRepo.GetUserByID(ctx, uID)
 	if err != nil {
 		return err
 	}
-
-	user.RefreshToken = "" // Clear token from DB
+	user.RefreshToken = ""
 	return s.userRepo.UpdateUser(ctx, user)
 }
 
-// Helper: Token generation logic
 func (s *authService) generateToken(userID, role string, expiry time.Duration) (string, error) {
 	claims := jwt.MapClaims{
 		"sub":  userID,
