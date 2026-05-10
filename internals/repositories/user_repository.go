@@ -14,6 +14,7 @@ type UserRepository interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, error)
 	UpdatePassword(ctx context.Context, id uuid.UUID, hashedPwd string) error
 	EmailExists(ctx context.Context, email string) bool
+	UpdateUser(ctx context.Context, user *models.User) error
 }
 
 type userRepository struct {
@@ -48,4 +49,8 @@ func (r *userRepository) EmailExists(ctx context.Context, email string) bool {
 	var count int64
 	r.db.WithContext(ctx).Model(&models.User{}).Where("email = ?", email).Count(&count)
 	return count > 0
+}
+
+func (r *userRepository) UpdateUser(ctx context.Context, user *models.User) error {
+	return r.db.WithContext(ctx).Save(user).Error
 }
