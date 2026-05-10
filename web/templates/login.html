@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PGBook | Login</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">PGBook</div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/login">Login</a>
+        <a href="/register">Register</a>
+      </nav>
+    </header>
+
+    <main class="container form-page">
+      <div class="panel">
+        <h1>Login</h1>
+        <form id="loginForm" class="form-grid">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required />
+
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required />
+
+          <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+        <div class="form-footer">
+          <span>New to PGBook?</span> <a href="/register">Create an account</a>
+        </div>
+        <div id="loginMessage" class="message"></div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>Secure login with session cookies and role-based dashboard.</p>
+    </footer>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

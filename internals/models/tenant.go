@@ -12,7 +12,7 @@ type Tenant struct {
 	ID                uuid.UUID  `gorm:"type:char(36);primaryKey" json:"id"`
 	UserID            uuid.UUID  `gorm:"type:char(36);index;not null" json:"user_id"` // User Table Link
 	PGID              uuid.UUID  `gorm:"type:char(36);index;not null" json:"pg_id"`
-	RoomID            uuid.UUID  `gorm:"type:char(36);index;not null" json:"room_id"`
+	RoomID            *uuid.UUID `gorm:"type:char(36);index" json:"room_id"` // Nullable for pending approval
 	FirstName         string     `gorm:"type:varchar(50);not null" json:"first_name"`
 	LastName          string     `gorm:"type:varchar(50)" json:"last_name"`
 	Phone             string     `gorm:"type:varchar(15);not null" json:"phone"`
@@ -20,6 +20,8 @@ type Tenant struct {
 	IDProofURL        string     `gorm:"type:varchar(255)" json:"id_proof_url"`
 	IDProofType       string     `gorm:"type:varchar(30)" json:"id_proof_type"`
 	JoiningDate       time.Time  `json:"joining_date"`
+	ActualJoiningDate *time.Time `json:"actual_joining_date"`
+	Status            string     `gorm:"type:varchar(20);default:'pending_approval'" json:"status"` // pending_approval, active, inactive
 	IsActive          bool       `gorm:"type:tinyint(1);default:1" json:"is_active"`
 	IsOnNotice        bool       `gorm:"type:tinyint(1);default:0" json:"is_on_notice"`
 	NoticePeriodDays  int        `gorm:"default:30" json:"notice_period_days"`

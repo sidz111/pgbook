@@ -47,6 +47,114 @@ type CreateTenantRequest struct {
 	IDProofType string `json:"id_proof_type"` // Aadhaar, PAN, Passport, etc.
 }
 
+// TenantSelfRegisterRequest defines request structure for self-registration
+type TenantSelfRegisterRequest struct {
+	FirstName   string `json:"first_name" binding:"required"`
+	LastName    string `json:"last_name"`
+	Phone       string `json:"phone" binding:"required"`
+	PGID        string `json:"pg_id" binding:"required"`
+	JoiningDate string `json:"joining_date"`  // ISO 8601 format
+	IDProofType string `json:"id_proof_type"` // Aadhaar, PAN, Passport, etc.
+}
+
+// SelfRegisterTenant - POST /v1/tenant/self-register
+func (h *TenantHandler) SelfRegisterTenant(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	var req TenantSelfRegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	pgID, err := uuid.Parse(req.PGID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid PG ID"})
+		return
+	}
+
+	userUUID, err := uuid.Parse(userID.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	joiningDate := time.Now()
+	if req.JoiningDate != "" {
+		if parsedDate, err := time.Parse("2006-01-02", req.JoiningDate); err == nil {
+			joiningDate = parsedDate
+		}
+	}
+
+	tenant := &models.Tenant{
+		UserID:           userUUID,
+		FirstName:        req.FirstName,
+		LastName:         req.LastName,
+		Phone:            req.Phone,
+		PGID:             pgID,
+		JoiningDate:      joiningDate,
+		IDProofType:      req.IDProofType,
+		Status:           "pending_approval", // New status for approval
+		NoticePeriodDays: 30,
+	}
+
+	if err := h.tenantService.CreateTenant(c.Request.Context(), tenant); err != nil {
+		h.logger.Error("Failed to self-register tenant", "error", err, "user_id", userID)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message":   "Tenant registration submitted for approval",
+		"tenant_id": tenant.ID,
+	})
+}
+func (h *TenantHandler) ApproveTenant(c *gin.Context) {
+	pgID, err := uuid.Parse(c.Param("pg_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid PG ID"})
+		return
+	}
+
+	tenantID, err := uuid.Parse(c.Param("tenant_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tenant ID"})
+		return
+	}
+
+	if !verifyPGOwnerOrAdmin(c, h.pgService, pgID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized access"})
+		return
+	}
+
+	var req struct {
+		RoomID string `json:"room_id" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	roomID, err := uuid.Parse(req.RoomID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room ID"})
+		return
+	}
+
+	if err := h.tenantService.ApproveTenant(c.Request.Context(), tenantID, roomID); err != nil {
+		h.logger.Error("Failed to approve tenant", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Tenant approved and room allocated"})
+}
+
 // CreateTenant - POST /v1/tenant/create
 func (h *TenantHandler) CreateTenant(c *gin.Context) {
 	var req CreateTenantRequest
@@ -112,7 +220,7 @@ func (h *TenantHandler) CreateTenant(c *gin.Context) {
 		FirstName:        req.FirstName,
 		LastName:         req.LastName,
 		Phone:            req.Phone,
-		RoomID:           roomID,
+		RoomID:           &roomID,
 		PGID:             pgID,
 		JoiningDate:      joiningDate,
 		IDProofType:      req.IDProofType,

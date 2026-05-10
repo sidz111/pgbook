@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PGBook | Tenant</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">PGBook</div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/tenant">Tenant</a>
+        <button id="logoutButton" class="btn btn-secondary">Logout</button>
+      </nav>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <h1>Tenant Dashboard</h1>
+        <div id="tenantMessage" class="message"></div>
+      </section>
+
+      <section class="panel form-panel">
+        <h2>Register as Tenant</h2>
+        <form id="tenantRegisterForm" class="form-grid">
+          <label for="pgId">PG ID</label>
+          <input
+            id="pgId"
+            name="pg_id"
+            placeholder="Enter PG ID to join"
+            required
+          />
+          <label for="firstName">First Name</label>
+          <input id="firstName" name="first_name" required />
+          <label for="lastName">Last Name</label>
+          <input id="lastName" name="last_name" />
+          <label for="phone">Phone</label>
+          <input id="phone" name="phone" required />
+          <label for="joiningDate">Joining Date</label>
+          <input id="joiningDate" name="joining_date" type="date" />
+          <label for="idProofType">ID Proof Type</label>
+          <select id="idProofType" name="id_proof_type">
+            <option value="Aadhaar">Aadhaar</option>
+            <option value="PAN">PAN</option>
+            <option value="Passport">Passport</option>
+            <option value="Driving License">Driving License</option>
+          </select>
+          <button type="submit" class="btn btn-primary">Register</button>
+        </form>
+      </section>
+
+      <section class="panel form-panel">
+        <h2>Load Tenant Profile</h2>
+        <form id="tenantLookupForm" class="form-grid">
+          <label for="tenantId">Tenant ID</label>
+          <input id="tenantId" name="tenant_id" required />
+          <button type="submit" class="btn btn-primary">Load Tenant</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Tenant Details</h2>
+        <div id="tenantInfo"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Payment History</h2>
+        <div id="tenantPayments"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Notice and Documents</h2>
+        <div class="notice-actions">
+          <button id="sendNoticeBtn" class="btn btn-primary">
+            Send Notice
+          </button>
+          <button id="cancelNoticeBtn" class="btn btn-secondary">
+            Cancel Notice
+          </button>
+        </div>
+        <div class="form-panel">
+          <h3>Upload Profile Photo</h3>
+          <form
+            id="uploadPhotoForm"
+            class="form-grid"
+            enctype="multipart/form-data"
+          >
+            <input
+              id="photoFile"
+              type="file"
+              name="photo"
+              accept="image/*"
+              required
+            />
+            <button type="submit" class="btn btn-primary">Upload Photo</button>
+          </form>
+        </div>
+        <div class="form-panel">
+          <h3>Upload ID Proof</h3>
+          <form
+            id="uploadIdForm"
+            class="form-grid"
+            enctype="multipart/form-data"
+          >
+            <input
+              id="idFile"
+              type="file"
+              name="document"
+              accept="image/*,.pdf"
+              required
+            />
+            <button type="submit" class="btn btn-primary">
+              Upload ID Proof
+            </button>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Tenant dashboard for status, payments, documents and notices.</p>
+    </footer>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

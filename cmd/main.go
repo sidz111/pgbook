@@ -42,60 +42,67 @@ func main() {
 
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(config.DB)
+	pgRepo := repositories.NewPGRepository(config.DB)
+	roomRepo := repositories.NewRoomRepository(config.DB)
+	tenantRepo := repositories.NewTenantRepository(config.DB)
+	paymentRepo := repositories.NewPaymentRepository(config.DB)
+	subscriptionRepo := repositories.NewSubscriptionRepository(config.DB)
 
 	// Get JWT secret from env
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		slog.Error("JWT_SECRET not set")
-		return
+		jwtSecret = "pgbook-default-secret"
+		slog.Warn("JWT_SECRET not set, using default development secret. Set JWT_SECRET in production.")
 	}
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, jwtSecret)
-
-	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(authService)
+	seedAdmin(authService, userRepo)
+	pgService := services.NewPGService(pgRepo, roomRepo, tenantRepo, subscriptionRepo)
+	roomService := services.NewRoomService(roomRepo, pgRepo)
+	tenantService := services.NewTenantService(tenantRepo, roomRepo, pgRepo)
+	paymentService := services.NewPaymentService(paymentRepo, tenantRepo, pgRepo, roomRepo)
+	subscriptionService := services.NewSubscriptionService(subscriptionRepo, pgRepo)
 
 	// Setup Gin router
 	r := gin.Default()
 
-	// Recovery middleware
+	// Serve static frontend assets and templates
+	r.Static("/static", "./web/static")
+	r.LoadHTMLGlob("web/templates/*.html")
+
+	// Recovery and middleware
 	r.Use(gin.Recovery())
-
-	// CORS middleware
 	r.Use(cors.Default())
-
-	// Rate limiting middleware for auth routes
-	limiter := rate.NewLimiter(rate.Every(time.Minute), 10) // 10 requests per minute
+	limiter := rate.NewLimiter(rate.Every(time.Second), 100) // 100 requests per second
 	r.Use(middleware.RateLimitMiddleware(limiter))
-
-	// HTTPS enforcement middleware
 	r.Use(middleware.HTTPSRedirectMiddleware())
 
-	// API versioning
-	v1 := r.Group("/v1")
-	{
-		// Health check
-		v1.GET("/health", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"status": "ok"})
-		})
+	// Register API routes
+	handlers.RegisterRoutes(r, jwtSecret, authService, pgService, roomService, tenantService, paymentService, subscriptionService)
 
-		// Auth routes
-		auth := v1.Group("/auth")
-		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
-			auth.POST("/refresh", authHandler.RefreshToken)
-			auth.POST("/logout", middleware.AuthMiddleware(jwtSecret), authHandler.Logout)
-		}
-
-		// Protected routes (add more as needed)
-		protected := v1.Group("/")
-		protected.Use(middleware.AuthMiddleware(jwtSecret))
-		{
-			// Add other handlers here
-		}
-	}
+	// Frontend view routes
+	r.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.html", gin.H{"Page": "index"})
+	})
+	r.GET("/login", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "login.html", gin.H{"Page": "login"})
+	})
+	r.GET("/register", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "register.html", gin.H{"Page": "register"})
+	})
+	r.GET("/dashboard", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "dashboard.html", gin.H{"Page": "dashboard"})
+	})
+	r.GET("/owner", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "owner.html", gin.H{"Page": "owner"})
+	})
+	r.GET("/tenant", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "tenant.html", gin.H{"Page": "tenant"})
+	})
+	r.GET("/admin", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "admin.html", gin.H{"Page": "admin"})
+	})
 
 	// Start server
 	srv := &http.Server{
@@ -123,4 +130,35 @@ func main() {
 	}
 
 	slog.Info("Server exited")
+}
+
+func seedAdmin(authService services.AuthService, userRepo repositories.UserRepository) {
+	adminEmail := os.Getenv("ADMIN_EMAIL")
+	if adminEmail == "" {
+		adminEmail = "admin@pgbook.local"
+	}
+
+	adminPassword := os.Getenv("ADMIN_PASSWORD")
+	if adminPassword == "" {
+		adminPassword = "Admin@123"
+	}
+
+	ctx := context.Background()
+	if userRepo.EmailExists(ctx, adminEmail) {
+		slog.Info("Admin user already exists", "email", adminEmail)
+		return
+	}
+
+	adminUser := &models.User{
+		Email:    adminEmail,
+		Password: adminPassword,
+		Role:     models.RoleAdmin,
+	}
+
+	if err := authService.Register(ctx, adminUser); err != nil {
+		slog.Error("Failed to seed admin user", "error", err)
+		return
+	}
+
+	slog.Info("Seeded admin user", "email", adminEmail)
 }

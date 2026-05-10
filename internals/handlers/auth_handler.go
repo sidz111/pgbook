@@ -21,7 +21,7 @@ type RegisterRequest struct {
 	Name     string `json:"name" binding:"required"`
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8"`
-	Role     string `json:"role" binding:"required,oneof=admin owner tenant"`
+	Role     string `json:"role" binding:"required,oneof=admin pg_owner tenant owner"`
 }
 
 // Login Request Struct
@@ -37,6 +37,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	if req.Role == "owner" {
+		req.Role = models.RoleOwner
+	}
+
 	user := &models.User{
 		Email:    req.Email,
 		Password: req.Password,
@@ -48,7 +52,19 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Registration successful"})
+	accessToken, refreshToken, createdUser, err := h.service.Login(c.Request.Context(), req.Email, req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "registration succeeded but failed to create session"})
+		return
+	}
+
+	c.SetCookie("access_token", accessToken, 900, "/", "", false, true)
+	c.SetCookie("refresh_token", refreshToken, 604800, "/", "", false, true)
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Registration successful",
+		"user":    createdUser,
+	})
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
@@ -66,10 +82,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	// 1. Access Token Cookie (Short lived - 15 mins)
 	// Parameters: Name, Value, MaxAge (seconds), Path, Domain, Secure, HttpOnly
-	c.SetCookie("access_token", accessToken, 900, "/", "", true, true)
+	c.SetCookie("access_token", accessToken, 900, "/", "", false, true)
 
 	// 2. Refresh Token Cookie (Long lived - 7 days)
-	c.SetCookie("refresh_token", refreshToken, 604800, "/", "", true, true)
+	c.SetCookie("refresh_token", refreshToken, 604800, "/", "", false, true)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
@@ -92,7 +108,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	}
 
 	// Navin Access Token parat cookie madhe set kara
-	c.SetCookie("access_token", newAccessToken, 900, "/", "", true, true)
+	c.SetCookie("access_token", newAccessToken, 900, "/", "", false, true)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Token refreshed successfully"})
 }
@@ -110,8 +126,18 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	}
 
 	// Cookies clear karne (MaxAge = -1 mhanje tabadtob expire)
-	c.SetCookie("access_token", "", -1, "/", "", true, true)
-	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
+	c.SetCookie("access_token", "", -1, "/", "", false, true)
+	c.SetCookie("refresh_token", "", -1, "/", "", false, true)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+}
+
+func (h *AuthHandler) Me(c *gin.Context) {
+	userID := c.GetString("userID")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	role := c.GetString("role")
+	c.JSON(http.StatusOK, gin.H{"user_id": userID, "role": role})
 }

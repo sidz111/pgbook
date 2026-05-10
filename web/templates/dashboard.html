@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PGBook | Dashboard</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">PGBook</div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/login">Login</a>
+        <a href="/register">Register</a>
+        <button id="logoutButton" class="btn btn-secondary">Logout</button>
+      </nav>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <h1>Your Dashboard</h1>
+        <div id="userInfo" class="info-box"></div>
+        <div id="dashboardActions" class="button-row"></div>
+        <div id="dashboardMessage" class="message"></div>
+        <section id="dashboardDetails" class="panel hidden"></section>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        Dashboard routes adapt to your role and show only authorized controls.
+      </p>
+    </footer>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

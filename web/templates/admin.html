@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PGBook | Admin</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">PGBook</div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/admin">Admin</a>
+        <button id="logoutButton" class="btn btn-secondary">Logout</button>
+      </nav>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <h1>Admin Console</h1>
+        <div id="adminMessage" class="message"></div>
+      </section>
+
+      <section class="panel">
+        <h2>All PGs</h2>
+        <div id="pgList"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Pending Subscriptions</h2>
+        <div id="pendingSubscriptions"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Admin features for reviewing PGs and approving subscriptions.</p>
+    </footer>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

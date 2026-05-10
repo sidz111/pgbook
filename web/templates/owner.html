@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PGBook | PG Owner</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">PGBook</div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/owner">Owner</a>
+        <button id="logoutButton" class="btn btn-secondary">Logout</button>
+      </nav>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <h1>PG Owner Console</h1>
+        <div id="ownerMessage" class="message"></div>
+      </section>
+
+      <section class="grid-layout">
+        <article class="panel">
+          <h2>My PG</h2>
+          <div id="pgInfo"></div>
+        </article>
+        <article class="panel">
+          <h2>Statistics</h2>
+          <div id="statsInfo"></div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <h2>Create or Update PG</h2>
+        <form id="createPGForm" class="form-grid">
+          <label for="pgName">PG Name</label>
+          <input id="pgName" name="name" required />
+          <label for="pgAddress">Address</label>
+          <input id="pgAddress" name="address" required />
+          <label for="pgPhone">Phone</label>
+          <input id="pgPhone" name="phone" required />
+          <button type="submit" class="btn btn-primary">
+            Create / Update PG
+          </button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Rooms</h2>
+        <div id="roomList"></div>
+        <form id="createRoomForm" class="form-grid">
+          <label for="roomNumber">Room Number</label>
+          <input id="roomNumber" name="room_number" required />
+          <label for="sharingType">Sharing Type</label>
+          <input id="sharingType" name="sharing_type" required />
+          <label for="rentAmount">Rent Amount</label>
+          <input
+            id="rentAmount"
+            name="rent_amount"
+            type="number"
+            min="1"
+            required
+          />
+          <label for="capacity">Capacity</label>
+          <input id="capacity" name="capacity" type="number" min="1" required />
+          <button type="submit" class="btn btn-primary">Add Room</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Tenant Requests</h2>
+        <div id="tenantRequests"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Tenants</h2>
+        <div id="tenantList"></div>
+        <form id="createTenantForm" class="form-grid">
+          <label for="tenantFirstName">First Name</label>
+          <input id="tenantFirstName" name="first_name" required />
+          <label for="tenantLastName">Last Name</label>
+          <input id="tenantLastName" name="last_name" />
+          <label for="tenantPhone">Phone</label>
+          <input id="tenantPhone" name="phone" required />
+          <label for="tenantRoomId">Room ID</label>
+          <input id="tenantRoomId" name="room_id" required />
+          <label for="tenantJoiningDate">Joining Date</label>
+          <input id="tenantJoiningDate" type="date" name="joining_date" />
+          <label for="tenantIdProof">ID Proof Type</label>
+          <input id="tenantIdProof" name="id_proof_type" required />
+          <button type="submit" class="btn btn-primary">Add Tenant</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Pending Payments</h2>
+        <div id="pendingPayments"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Subscription</h2>
+        <div id="subscriptionInfo"></div>
+        <form id="createSubscriptionForm" class="form-grid">
+          <label for="subscriptionType">Subscription Type</label>
+          <input id="subscriptionType" name="subscription_type" required />
+          <label for="subscriptionDuration">Duration (months)</label>
+          <input
+            id="subscriptionDuration"
+            name="duration_months"
+            type="number"
+            min="1"
+            required
+          />
+          <button type="submit" class="btn btn-primary">
+            Request Subscription
+          </button>
+        </form>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        Owner dashboard with PG, room, tenant, payment and subscription
+        controls.
+      </p>
+    </footer>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

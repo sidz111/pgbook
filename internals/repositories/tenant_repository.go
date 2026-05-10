@@ -16,6 +16,7 @@ type TenantRepository interface {
 	GetTenantsByPGID(ctx context.Context, pgID uuid.UUID) ([]models.Tenant, error)
 	UpdateTenant(ctx context.Context, tenant *models.Tenant) error
 	UpdateProfilePhoto(ctx context.Context, id uuid.UUID, photoURL string) error
+	CountTenantsInRoom(ctx context.Context, roomID uuid.UUID) (int, error)
 
 	// Notice & Exit Logic
 	SetNoticePeriod(ctx context.Context, id uuid.UUID, exitDate time.Time) error
@@ -76,6 +77,14 @@ func (r *tenantRepository) UpdateTenant(ctx context.Context, tenant *models.Tena
 
 func (r *tenantRepository) UpdateProfilePhoto(ctx context.Context, id uuid.UUID, photoURL string) error {
 	return r.db.WithContext(ctx).Model(&models.Tenant{}).Where("id = ?", id).Update("profile_picture_url", photoURL).Error
+}
+
+func (r *tenantRepository) CountTenantsInRoom(ctx context.Context, roomID uuid.UUID) (int, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.Tenant{}).
+		Where("room_id = ? AND status = ?", roomID, "active").
+		Count(&count).Error
+	return int(count), err
 }
 
 func (r *tenantRepository) SetNoticePeriod(ctx context.Context, id uuid.UUID, exitDate time.Time) error {

@@ -20,6 +20,7 @@ type TenantService interface {
 	GetTenantsByPG(ctx context.Context, pgID uuid.UUID) ([]models.Tenant, error)
 	UpdateTenant(ctx context.Context, tenant *models.Tenant) error
 	UpdateProfilePhoto(ctx context.Context, tenantID uuid.UUID, photoURL string) error
+	ApproveTenant(ctx context.Context, tenantID uuid.UUID, roomID uuid.UUID) error
 
 	// Notice Period & Exit Management
 	InitiateNotice(ctx context.Context, tenantID uuid.UUID, noticePeriodDays int) error
@@ -64,21 +65,27 @@ func (s *tenantService) CreateTenant(ctx context.Context, tenant *models.Tenant)
 	if tenant.PGID == uuid.Nil {
 		return errors.New("PG_id is required")
 	}
-	if tenant.RoomID == uuid.Nil {
+	// For pending approval tenants, room assignment happens later
+	if tenant.Status == "pending_approval" {
+		// Verify PG exists
+		_, err := s.pgRepo.GetPGByID(ctx, tenant.PGID)
+		if err != nil {
+			return errors.New("PG not found")
+		}
+
+		tenant.ID = uuid.New()
+		tenant.IsActive = true
+		tenant.IsOnNotice = false
+		return s.tenantRepo.CreateTenant(ctx, tenant)
+	}
+
+	// For direct creation, room is required
+	if tenant.RoomID == nil || *tenant.RoomID == uuid.Nil {
 		return errors.New("room_id is required")
-	}
-	if tenant.FirstName == "" {
-		return errors.New("first name is required")
-	}
-	if tenant.Phone == "" {
-		return errors.New("phone number is required")
-	}
-	if tenant.JoiningDate.IsZero() {
-		tenant.JoiningDate = time.Now()
 	}
 
 	// Verify room exists and has capacity
-	room, err := s.roomRepo.GetRoomByID(ctx, tenant.RoomID)
+	room, err := s.roomRepo.GetRoomByID(ctx, *tenant.RoomID)
 	if err != nil {
 		return errors.New("room not found")
 	}
@@ -194,6 +201,68 @@ func (s *tenantService) UpdateProfilePhoto(ctx context.Context, tenantID uuid.UU
 	}
 
 	s.logger.Info("Tenant photo updated", "tenant_id", tenantID)
+	return nil
+}
+
+// ApproveTenant approves a tenant and assigns a room
+func (s *tenantService) ApproveTenant(ctx context.Context, tenantID uuid.UUID, roomID uuid.UUID) error {
+	if tenantID == uuid.Nil {
+		return errors.New("invalid tenant ID")
+	}
+	if roomID == uuid.Nil {
+		return errors.New("invalid room ID")
+	}
+
+	// Get tenant
+	tenant, err := s.tenantRepo.GetTenantByID(ctx, tenantID)
+	if err != nil {
+		s.logger.Error("Failed to get tenant", "error", err, "tenant_id", tenantID)
+		return errors.New("tenant not found")
+	}
+
+	if tenant.Status != "pending_approval" {
+		return errors.New("tenant is not pending approval")
+	}
+
+	// Check if room is available
+	room, err := s.roomRepo.GetRoomByID(ctx, roomID)
+	if err != nil {
+		s.logger.Error("Failed to get room", "error", err, "room_id", roomID)
+		return errors.New("room not found")
+	}
+
+	if room.Occupied >= room.Capacity {
+		return errors.New("room is at full capacity")
+	}
+
+	// Check room capacity with current tenants
+	occupiedCount, err := s.tenantRepo.CountTenantsInRoom(ctx, roomID)
+	if err != nil {
+		s.logger.Error("Failed to count tenants in room", "error", err, "room_id", roomID)
+		return errors.New("failed to check room capacity")
+	}
+
+	if occupiedCount >= int(room.Capacity) {
+		return errors.New("room is at full capacity")
+	}
+
+	// Update tenant status and assign room
+	tenant.Status = "active"
+	tenant.RoomID = &roomID
+	now := time.Now()
+	tenant.ActualJoiningDate = &now
+
+	if err := s.tenantRepo.UpdateTenant(ctx, tenant); err != nil {
+		s.logger.Error("Failed to approve tenant", "error", err, "tenant_id", tenantID)
+		return errors.New("failed to approve tenant")
+	}
+
+	// Update room occupancy
+	if err := s.roomRepo.UpdateOccupancy(ctx, roomID, true); err != nil {
+		s.logger.Warn("Failed to update room occupancy", "error", err, "room_id", roomID)
+	}
+
+	s.logger.Info("Tenant approved and room assigned", "tenant_id", tenantID, "room_id", roomID)
 	return nil
 }
 
