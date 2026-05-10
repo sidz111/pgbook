@@ -39,6 +39,8 @@
         <form id="createPGForm" class="form-grid">
           <label for="pgName">PG Name</label>
           <input id="pgName" name="name" required />
+          <label for="ownerName">Owner Name</label>
+          <input id="ownerName" name="owner_name" required />
           <label for="pgAddress">Address</label>
           <input id="pgAddress" name="address" required />
           <label for="pgPhone">Phone</label>
@@ -79,21 +81,6 @@
       <section class="panel">
         <h2>Tenants</h2>
         <div id="tenantList"></div>
-        <form id="createTenantForm" class="form-grid">
-          <label for="tenantFirstName">First Name</label>
-          <input id="tenantFirstName" name="first_name" required />
-          <label for="tenantLastName">Last Name</label>
-          <input id="tenantLastName" name="last_name" />
-          <label for="tenantPhone">Phone</label>
-          <input id="tenantPhone" name="phone" required />
-          <label for="tenantRoomId">Room ID</label>
-          <input id="tenantRoomId" name="room_id" required />
-          <label for="tenantJoiningDate">Joining Date</label>
-          <input id="tenantJoiningDate" type="date" name="joining_date" />
-          <label for="tenantIdProof">ID Proof Type</label>
-          <input id="tenantIdProof" name="id_proof_type" required />
-          <button type="submit" class="btn btn-primary">Add Tenant</button>
-        </form>
       </section>
 
       <section class="panel">

@@ -194,7 +194,6 @@ func (h *TenantHandler) CreateTenant(c *gin.Context) {
 	}
 
 	userID := uuid.Nil
-	role := ""
 	if req.UserID != "" {
 		userID, err = uuid.Parse(req.UserID)
 		if err != nil {
@@ -202,17 +201,13 @@ func (h *TenantHandler) CreateTenant(c *gin.Context) {
 			return
 		}
 	} else {
-		currentUser, currentRole, roleErr := getAuthUser(c)
+		currentUser, _, roleErr := getAuthUser(c)
 		if roleErr != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated request"})
 			return
 		}
+		// If owner/admin is creating a tenant manually, associate the tenant record with the current user as a placeholder.
 		userID = currentUser
-		role = currentRole
-		if role != models.RoleTenant {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "user_id is required for PG owner or admin tenant creation"})
-			return
-		}
 	}
 
 	tenant := &models.Tenant{

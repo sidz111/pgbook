@@ -200,7 +200,7 @@ async function initOwner() {
 
       // Load available rooms for approval forms
       const rooms = await apiFetch(`/pg/${currentPGId}/rooms`);
-      const availableRooms = rooms.filter((r) => r.status === "available");
+      const availableRooms = rooms.filter((r) => r.occupied < r.capacity);
       document
         .querySelectorAll('.approve-form select[name="room_id"]')
         .forEach((select) => {
@@ -321,33 +321,6 @@ async function initOwner() {
           body: payload,
         });
         showMessage("ownerMessage", "Room added successfully.");
-        await loadRooms();
-      } catch (err) {
-        showMessage("ownerMessage", err.message, "error");
-      }
-    });
-
-  document
-    .getElementById("createTenantForm")
-    .addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (!currentPGId) return;
-      const payload = {
-        first_name: event.target.first_name.value,
-        last_name: event.target.last_name.value,
-        phone: event.target.phone.value,
-        room_id: event.target.room_id.value,
-        joining_date: event.target.joining_date.value,
-        id_proof_type: event.target.id_proof_type.value,
-        pg_id: currentPGId,
-      };
-      try {
-        await apiFetch(`/pg/${currentPGId}/tenants`, {
-          method: "POST",
-          body: payload,
-        });
-        showMessage("ownerMessage", "Tenant created successfully.");
-        await loadTenants();
         await loadRooms();
       } catch (err) {
         showMessage("ownerMessage", err.message, "error");
