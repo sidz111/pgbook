@@ -10,14 +10,13 @@ import (
 
 type PGRepository interface {
 	CreatePG(ctx context.Context, pg *models.PG) error
-	GetPGByEmail(ctx context.Context, email string) (*models.PG, error)
 	GetPGByID(ctx context.Context, id uuid.UUID) (*models.PG, error)
+	GetPGByUserID(ctx context.Context, userID uuid.UUID) (*models.PG, error)
 	UpdatePG(ctx context.Context, pg *models.PG) error
-	UpdatePassword(ctx context.Context, id uuid.UUID, newPassword string) error
+	UpdateOwnerPhoto(ctx context.Context, id uuid.UUID, photoURL string) error
 	DeletePG(ctx context.Context, id uuid.UUID) error
 	GetPGStatistics(ctx context.Context, id uuid.UUID) (map[string]int64, error)
 	GetAllPGs(ctx context.Context, limit int, offset int) ([]models.PG, error)
-	EmailExists(ctx context.Context, email string) bool
 }
 
 type pgRepository struct {
@@ -32,30 +31,28 @@ func (r *pgRepository) CreatePG(ctx context.Context, pg *models.PG) error {
 	return r.db.WithContext(ctx).Create(pg).Error
 }
 
-func (r *pgRepository) GetPGByEmail(ctx context.Context, email string) (*models.PG, error) {
-	var pg models.PG
-	err := r.db.WithContext(ctx).Where("email = ?", email).First(&pg).Error
-	if err != nil {
-		return nil, err
-	}
-	return &pg, nil
-}
-
 func (r *pgRepository) GetPGByID(ctx context.Context, id uuid.UUID) (*models.PG, error) {
 	var pg models.PG
 	err := r.db.WithContext(ctx).Preload("Rooms").Preload("Tenants").First(&pg, "id = ?", id).Error
-	if err != nil {
-		return nil, err
-	}
-	return &pg, nil
+	return &pg, err
+}
+
+func (r *pgRepository) GetPGByUserID(ctx context.Context, userID uuid.UUID) (*models.PG, error) {
+	var pg models.PG
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&pg).Error
+	return &pg, err
 }
 
 func (r *pgRepository) UpdatePG(ctx context.Context, pg *models.PG) error {
-	return r.db.WithContext(ctx).Model(&models.PG{}).Where("id = ?", pg.ID).Updates(pg).Error
+	return r.db.WithContext(ctx).Model(&models.PG{}).
+		Where("id = ?", pg.ID).
+		Select("*").
+		Omit("ID", "UserID"). // dont update UserID
+		Updates(pg).Error
 }
 
-func (r *pgRepository) UpdatePassword(ctx context.Context, id uuid.UUID, newPassword string) error {
-	return r.db.WithContext(ctx).Model(&models.PG{}).Where("id = ?", id).Update("password", newPassword).Error
+func (r *pgRepository) UpdateOwnerPhoto(ctx context.Context, id uuid.UUID, photoURL string) error {
+	return r.db.WithContext(ctx).Model(&models.PG{}).Where("id = ?", id).Update("owner_photo_url", photoURL).Error
 }
 
 func (r *pgRepository) DeletePG(ctx context.Context, id uuid.UUID) error {
@@ -66,24 +63,21 @@ func (r *pgRepository) GetPGStatistics(ctx context.Context, id uuid.UUID) (map[s
 	var roomCount int64
 	var tenantCount int64
 
-	r.db.WithContext(ctx).Model(&models.Room{}).Where("pg_id = ?", id).Count(&roomCount)
-	r.db.WithContext(ctx).Model(&models.Tenant{}).Where("pg_id = ? AND is_active = ?", id, true).Count(&tenantCount)
+	if err := r.db.WithContext(ctx).Model(&models.Room{}).Where("pg_id = ?", id).Count(&roomCount).Error; err != nil {
+		return nil, err
+	}
+	if err := r.db.WithContext(ctx).Model(&models.Tenant{}).Where("pg_id = ? AND is_active = ?", id, true).Count(&tenantCount).Error; err != nil {
+		return nil, err
+	}
 
-	stats := map[string]int64{
+	return map[string]int64{
 		"total_rooms":    roomCount,
 		"active_tenants": tenantCount,
-	}
-	return stats, nil
+	}, nil
 }
 
 func (r *pgRepository) GetAllPGs(ctx context.Context, limit int, offset int) ([]models.PG, error) {
 	var pgs []models.PG
 	err := r.db.WithContext(ctx).Limit(limit).Offset(offset).Find(&pgs).Error
 	return pgs, err
-}
-
-func (r *pgRepository) EmailExists(ctx context.Context, email string) bool {
-	var count int64
-	r.db.WithContext(ctx).Model(&models.PG{}).Where("email = ?", email).Count(&count)
-	return count > 0
 }
