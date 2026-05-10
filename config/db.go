@@ -35,6 +35,15 @@ func ConnectDB() error {
 		return fmt.Errorf("Error connecting to database: %v", err)
 	}
 
+	// Configure connection pooling
+	sqlDB, err := db.DB()
+	if err != nil {
+		return fmt.Errorf("Error getting sql.DB: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetConnMaxLifetime(0)
+
 	DB = db
 	return nil
 }

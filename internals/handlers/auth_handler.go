@@ -20,7 +20,7 @@ func NewAuthHandler(service services.AuthService) *AuthHandler {
 type RegisterRequest struct {
 	Name     string `json:"name" binding:"required"`
 	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
+	Password string `json:"password" binding:"required,min=8"`
 	Role     string `json:"role" binding:"required,oneof=admin owner tenant"`
 }
 
@@ -66,10 +66,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	// 1. Access Token Cookie (Short lived - 15 mins)
 	// Parameters: Name, Value, MaxAge (seconds), Path, Domain, Secure, HttpOnly
-	c.SetCookie("access_token", accessToken, 900, "/", "", false, true)
+	c.SetCookie("access_token", accessToken, 900, "/", "", true, true)
 
 	// 2. Refresh Token Cookie (Long lived - 7 days)
-	c.SetCookie("refresh_token", refreshToken, 604800, "/", "", false, true)
+	c.SetCookie("refresh_token", refreshToken, 604800, "/", "", true, true)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
@@ -92,15 +92,26 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	}
 
 	// Navin Access Token parat cookie madhe set kara
-	c.SetCookie("access_token", newAccessToken, 900, "/", "", false, true)
+	c.SetCookie("access_token", newAccessToken, 900, "/", "", true, true)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Token refreshed successfully"})
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
+	userID := c.GetString("userID")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	if err := h.service.Logout(c.Request.Context(), userID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	// Cookies clear karne (MaxAge = -1 mhanje tabadtob expire)
-	c.SetCookie("access_token", "", -1, "/", "", false, true)
-	c.SetCookie("refresh_token", "", -1, "/", "", false, true)
+	c.SetCookie("access_token", "", -1, "/", "", true, true)
+	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
