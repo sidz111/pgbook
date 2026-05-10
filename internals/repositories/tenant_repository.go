@@ -23,6 +23,7 @@ type TenantRepository interface {
 	GetTenantsOnNotice(ctx context.Context, pgID uuid.UUID) ([]models.Tenant, error)
 	ProcessExpiries(ctx context.Context) error
 	CancelNotice(ctx context.Context, id uuid.UUID) error
+	GetTenantByDocumentURL(ctx context.Context, documentURL string) (*models.Tenant, error)
 }
 
 type tenantRepository struct {
@@ -130,6 +131,14 @@ func (r *tenantRepository) ProcessExpiries(ctx context.Context) error {
 		}
 		return nil
 	})
+}
+
+func (r *tenantRepository) GetTenantByDocumentURL(ctx context.Context, documentURL string) (*models.Tenant, error) {
+	var tenant models.Tenant
+	err := r.db.WithContext(ctx).
+		Where("profile_picture_url = ? OR id_proof_url = ?", documentURL, documentURL).
+		First(&tenant).Error
+	return &tenant, err
 }
 
 func (r *tenantRepository) CancelNotice(ctx context.Context, id uuid.UUID) error {
