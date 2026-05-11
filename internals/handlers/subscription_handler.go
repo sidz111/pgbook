@@ -27,7 +27,7 @@ func NewSubscriptionHandler(subscriptionService services.SubscriptionService, pg
 type CreateSubscriptionRequest struct {
 	PGID     string  `json:"pg_id" binding:"required"`
 	Amount   float64 `json:"amount" binding:"required,gt=0"`
-	ProofURL string  `json:"proof_url" binding:"required,url"`
+	ProofURL string  `json:"proof_url" binding:"required"`
 	PlanName string  `json:"plan_name"`
 }
 
@@ -38,13 +38,34 @@ type ApproveSubscriptionRequest struct {
 func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	var req CreateSubscriptionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.logger.Error("Subscription binding error", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "validation failed: " + err.Error(),
+			"details": map[string]interface{}{
+				"required_fields":             []string{"pg_id", "amount", "proof_url"},
+				"amount_must_be_greater_than": 0,
+			},
+		})
+		return
+	}
+
+	// Additional validation
+	if req.PGID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pg_id is required"})
+		return
+	}
+	if req.Amount <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "amount must be greater than 0"})
+		return
+	}
+	if req.ProofURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "proof_url (payment screenshot URL) is required"})
 		return
 	}
 
 	pgID, err := uuid.Parse(req.PGID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid PG ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid PG ID format"})
 		return
 	}
 

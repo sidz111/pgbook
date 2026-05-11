@@ -260,6 +260,25 @@ func (h *PGHandler) ListAllPGs(c *gin.Context) {
 	})
 }
 
+// ListAllAvailablePGs - GET /v1/pgs/available (Public - for tenants to see all PGs)
+func (h *PGHandler) ListAllAvailablePGs(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	pgs, err := h.pgService.GetAllPGs(c.Request.Context(), limit, offset)
+	if err != nil {
+		h.logger.Error("Failed to list available PGs", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"pgs":    pgs,
+		"limit":  limit,
+		"offset": offset,
+	})
+}
+
 // Helper: verifyPGAccess checks if user has access to PG
 func (h *PGHandler) verifyPGAccess(c *gin.Context, pgID uuid.UUID) bool {
 	role, _ := c.Get("role")

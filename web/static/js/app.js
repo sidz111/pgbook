@@ -353,9 +353,35 @@ async function initOwner() {
 }
 
 async function initTenant() {
+  // Load available PGs for the tenant registration form
+  async function loadAvailablePGs() {
+    try {
+      const data = await apiFetch("/tenant/pgs/available");
+      const pgSelect = document.getElementById("pgId");
+      if (pgSelect && data.pgs) {
+        // Clear existing options except the first placeholder
+        while (pgSelect.options.length > 1) {
+          pgSelect.remove(1);
+        }
+        // Add available PGs as options
+        data.pgs.forEach((pg) => {
+          const option = document.createElement("option");
+          option.value = pg.id;
+          option.textContent = `${pg.name} - ${pg.address} (Owner: ${pg.owner_name})`;
+          pgSelect.appendChild(option);
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load available PGs:", err.message);
+    }
+  }
+
   // Handle tenant self-registration
   const registerForm = document.getElementById("tenantRegisterForm");
   if (registerForm) {
+    // Load PGs when form is displayed
+    loadAvailablePGs();
+
     registerForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const payload = {
@@ -512,8 +538,9 @@ async function initAdmin() {
   async function loadPGs() {
     try {
       const data = await apiFetch("/pg/list");
-      document.getElementById("pgList").innerHTML = data.length
-        ? data
+      const pgs = data.pgs || [];
+      document.getElementById("pgList").innerHTML = pgs.length
+        ? pgs
             .map(
               (pg) =>
                 `<div class="item-card"><strong>${pg.name}</strong> • ${pg.address} • Owner ${pg.owner_name}</div>`,

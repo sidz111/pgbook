@@ -71,6 +71,16 @@ func (s *roomService) CreateRoom(ctx context.Context, room *models.Room) error {
 		return errors.New("PG not found")
 	}
 
+	// Check if room number already exists in this PG
+	exists, err := s.roomRepo.RoomNumberExists(ctx, room.PGID, room.RoomNumber)
+	if err != nil {
+		s.logger.Error("Failed to check room number existence", "error", err, "pg_id", room.PGID, "room_number", room.RoomNumber)
+		return errors.New("failed to validate room number")
+	}
+	if exists {
+		return errors.New("room number already exists in this PG")
+	}
+
 	room.ID = uuid.New()
 	room.Occupied = 0
 

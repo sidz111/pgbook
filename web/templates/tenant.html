@@ -26,13 +26,10 @@
       <section class="panel form-panel">
         <h2>Register as Tenant</h2>
         <form id="tenantRegisterForm" class="form-grid">
-          <label for="pgId">PG ID</label>
-          <input
-            id="pgId"
-            name="pg_id"
-            placeholder="Enter PG ID to join"
-            required
-          />
+          <label for="pgId">Select PG</label>
+          <select id="pgId" name="pg_id" required>
+            <option value="">-- Choose a PG --</option>
+          </select>
           <label for="firstName">First Name</label>
           <input id="firstName" name="first_name" required />
           <label for="lastName">Last Name</label>
@@ -108,7 +105,7 @@
             <input
               id="idFile"
               type="file"
-              name="document"
+              name="id_proof"
               accept="image/*,.pdf"
               required
             />

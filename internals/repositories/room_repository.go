@@ -15,6 +15,7 @@ type RoomRepository interface {
 	UpdateRoom(ctx context.Context, room *models.Room) error
 	DeleteRoom(ctx context.Context, id uuid.UUID) error
 	UpdateOccupancy(ctx context.Context, roomID uuid.UUID, increment bool) error
+	RoomNumberExists(ctx context.Context, pgID uuid.UUID, roomNumber string) (bool, error)
 }
 
 type roomRepository struct {
@@ -59,4 +60,15 @@ func (r *roomRepository) UpdateOccupancy(ctx context.Context, roomID uuid.UUID, 
 	return r.db.WithContext(ctx).Model(&models.Room{}).
 		Where("id = ?", roomID).
 		UpdateColumn("occupied", gorm.Expr("occupied + ?", val)).Error
+}
+
+func (r *roomRepository) RoomNumberExists(ctx context.Context, pgID uuid.UUID, roomNumber string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.Room{}).
+		Where("pg_id = ? AND room_number = ?", pgID, roomNumber).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

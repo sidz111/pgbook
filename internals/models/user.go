@@ -14,6 +14,7 @@ const (
 type User struct {
 	gorm.Model
 	ID           uuid.UUID `gorm:"type:char(36);primaryKey" json:"id"`
+	Name         string    `gorm:"type:varchar(100);not null" json:"name"`
 	Email        string    `gorm:"type:varchar(100);uniqueIndex;not null" json:"email"`
 	Password     string    `gorm:"type:varchar(255);not null" json:"-"`
 	Role         string    `gorm:"type:varchar(20);default:'tenant';not null" json:"role"`

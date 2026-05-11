@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/sidz111/pgbook/internals/models"
@@ -78,6 +79,12 @@ func (s *pgService) CreatePG(ctx context.Context, pg *models.PG) error {
 	if err := s.pgRepo.CreatePG(ctx, pg); err != nil {
 		s.logger.Error("Failed to create PG", "error", err, "user_id", pg.UserID)
 		return errors.New("failed to create PG")
+	}
+
+	// Auto-activate 1-month free trial subscription
+	if err := s.ActivateTrial(ctx, pg.ID); err != nil {
+		s.logger.Error("Failed to activate trial", "error", err, "pg_id", pg.ID)
+		// Don't fail the PG creation, just log the trial activation error
 	}
 
 	s.logger.Info("PG created successfully", "pg_id", pg.ID, "owner_id", pg.UserID)
@@ -267,8 +274,33 @@ func (s *pgService) ActivateTrial(ctx context.Context, pgID uuid.UUID) error {
 		return errors.New("PG already has active subscription")
 	}
 
-	// This would typically set trial_ends_at in the database
-	// For now, just log it
+	// Create 1-month free trial subscription
+	now := time.Now()
+	trialSubscription := &models.Subscription{
+		ID:         uuid.New(),
+		PGID:       pgID,
+		PlanName:   "Free Trial",
+		Amount:     0,
+		ProofURL:   "",
+		Status:     "active",
+		StartDate:  now,
+		ExpiryDate: now.AddDate(0, 1, 0), // 1 month from now
+		VerifiedAt: &now,
+		VerifiedBy: "system",
+	}
+
+	if err := s.subscriptionRepo.CreateSubscription(ctx, trialSubscription); err != nil {
+		s.logger.Error("Failed to create trial subscription", "error", err, "pg_id", pgID)
+		return errors.New("failed to activate trial")
+	}
+
+	// Mark PG as subscribed
+	pg.IsSubscribed = true
+	pg.TrialEndsAt = &trialSubscription.ExpiryDate
+	if err := s.pgRepo.UpdatePG(ctx, pg); err != nil {
+		s.logger.Error("Failed to update PG subscription status", "error", err, "pg_id", pgID)
+	}
+
 	s.logger.Info("Trial activated for PG", "pg_id", pgID)
 	return nil
 }

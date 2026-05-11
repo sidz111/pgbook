@@ -107,7 +107,7 @@ func RegisterRoutes(
 			subscriptions := pg.Group("/:pg_id/subscription")
 			{
 				subscriptions.POST("", authHandler.checkOwnerOrAdmin(subscriptionHandler.CreateSubscription))
-				subscriptions.GET("/active", subscriptionHandler.GetActiveSubscription)
+				subscriptions.GET("/:pg_id/active", subscriptionHandler.GetActiveSubscription)
 				subscriptions.GET("/history", authHandler.checkOwnerOrAdmin(subscriptionHandler.GetSubscriptionsByPG))
 			}
 
@@ -122,6 +122,7 @@ func RegisterRoutes(
 		// Tenant Routes
 		tenant := protected.Group("/tenant")
 		{
+			tenant.GET("/pgs/available", pgHandler.ListAllAvailablePGs)
 			tenant.POST("/self-register", tenantHandler.SelfRegisterTenant)
 			tenant.GET("/:tenant_id", tenantHandler.GetTenantDetails)
 			tenant.GET("/:tenant_id/status", tenantHandler.GetTenantStatus)

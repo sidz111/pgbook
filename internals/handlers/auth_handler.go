@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sidz111/pgbook/internals/models"
@@ -32,34 +33,67 @@ type LoginRequest struct {
 
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req RegisterRequest
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 
+	// Convert owner -> pg_owner
 	if req.Role == "owner" {
 		req.Role = models.RoleOwner
 	}
 
+	// Validate role safety
+	validRoles := map[string]bool{
+		models.RoleAdmin:  true,
+		models.RoleOwner:  true,
+		models.RoleTenant: true,
+	}
+
+	if !validRoles[req.Role] {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid role",
+		})
+		return
+	}
+
 	user := &models.User{
+		Name:     req.Name,
 		Email:    req.Email,
 		Password: req.Password,
 		Role:     req.Role,
 	}
 
 	if err := h.service.Register(c.Request.Context(), user); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 
-	accessToken, refreshToken, createdUser, err := h.service.Login(c.Request.Context(), req.Email, req.Password)
+	// Auto login after registration
+	accessToken, refreshToken, createdUser, err := h.service.Login(
+		c.Request.Context(),
+		req.Email,
+		req.Password,
+	)
+
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "registration succeeded but failed to create session"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "registration succeeded but failed to create session",
+		})
 		return
 	}
 
-	c.SetCookie("access_token", accessToken, 900, "/", "", false, true)
-	c.SetCookie("refresh_token", refreshToken, 604800, "/", "", false, true)
+	// Secure cookies only in production
+	secureCookie := os.Getenv("ENV") == "production"
+
+	// Set auth cookies
+	c.SetCookie("access_token", accessToken, 900, "/", "", secureCookie, true)
+	c.SetCookie("refresh_token", refreshToken, 604800, "/", "", secureCookie, true)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Registration successful",
@@ -69,23 +103,34 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 
-	accessToken, refreshToken, user, err := h.service.Login(c.Request.Context(), req.Email, req.Password)
+	accessToken, refreshToken, user, err := h.service.Login(
+		c.Request.Context(),
+		req.Email,
+		req.Password,
+	)
+
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 
-	// 1. Access Token Cookie (Short lived - 15 mins)
-	// Parameters: Name, Value, MaxAge (seconds), Path, Domain, Secure, HttpOnly
-	c.SetCookie("access_token", accessToken, 900, "/", "", false, true)
+	secureCookie := os.Getenv("ENV") == "production"
 
-	// 2. Refresh Token Cookie (Long lived - 7 days)
-	c.SetCookie("refresh_token", refreshToken, 604800, "/", "", false, true)
+	// Access token (15 min)
+	c.SetCookie("access_token", accessToken, 900, "/", "", secureCookie, true)
+
+	// Refresh token (7 days)
+	c.SetCookie("refresh_token", refreshToken, 604800, "/", "", secureCookie, true)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
@@ -94,50 +139,77 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
-	// Cookie madhun refresh token kadha
+	// Get refresh token from cookie
 	cookieToken, err := c.Cookie("refresh_token")
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Refresh token missing"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "refresh token missing",
+		})
 		return
 	}
 
-	newAccessToken, err := h.service.RefreshToken(c.Request.Context(), cookieToken)
+	newAccessToken, err := h.service.RefreshToken(
+		c.Request.Context(),
+		cookieToken,
+	)
+
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "invalid refresh token",
+		})
 		return
 	}
 
-	// Navin Access Token parat cookie madhe set kara
-	c.SetCookie("access_token", newAccessToken, 900, "/", "", false, true)
+	secureCookie := os.Getenv("ENV") == "production"
 
-	c.JSON(http.StatusOK, gin.H{"message": "Token refreshed successfully"})
+	// Set new access token
+	c.SetCookie("access_token", newAccessToken, 900, "/", "", secureCookie, true)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Token refreshed successfully",
+	})
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
 	userID := c.GetString("userID")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "user not authenticated",
+		})
 		return
 	}
 
 	if err := h.service.Logout(c.Request.Context(), userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 
-	// Cookies clear karne (MaxAge = -1 mhanje tabadtob expire)
-	c.SetCookie("access_token", "", -1, "/", "", false, true)
-	c.SetCookie("refresh_token", "", -1, "/", "", false, true)
+	secureCookie := os.Getenv("ENV") == "production"
 
-	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+	// Clear cookies
+	c.SetCookie("access_token", "", -1, "/", "", secureCookie, true)
+	c.SetCookie("refresh_token", "", -1, "/", "", secureCookie, true)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Logged out successfully",
+	})
 }
 
 func (h *AuthHandler) Me(c *gin.Context) {
 	userID := c.GetString("userID")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "user not authenticated",
+		})
 		return
 	}
+
 	role := c.GetString("role")
-	c.JSON(http.StatusOK, gin.H{"user_id": userID, "role": role})
+
+	c.JSON(http.StatusOK, gin.H{
+		"user_id": userID,
+		"role":    role,
+	})
 }
