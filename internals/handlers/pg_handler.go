@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sidz111/pgbook/internals/models"
 	"github.com/sidz111/pgbook/internals/services"
+	"github.com/sidz111/pgbook/internals/utils"
 )
 
 type PGHandler struct {
@@ -16,6 +17,7 @@ type PGHandler struct {
 	roomService         services.RoomService
 	tenantService       services.TenantService
 	subscriptionService services.SubscriptionService
+	fileUploadService   *utils.FileUploadService
 	logger              *slog.Logger
 }
 
@@ -24,12 +26,14 @@ func NewPGHandler(
 	roomService services.RoomService,
 	tenantService services.TenantService,
 	subscriptionService services.SubscriptionService,
+	fileUploadService *utils.FileUploadService,
 ) *PGHandler {
 	return &PGHandler{
 		pgService:           pgService,
 		roomService:         roomService,
 		tenantService:       tenantService,
 		subscriptionService: subscriptionService,
+		fileUploadService:   fileUploadService,
 		logger:              slog.Default(),
 	}
 }
@@ -78,10 +82,7 @@ func (h *PGHandler) CreatePG(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "PG created successfully",
-		"pg_id":   pg.ID,
-	})
+	c.JSON(http.StatusCreated, gin.H{"message": "PG created successfully"})
 }
 
 // GetPGByOwner - GET /v1/pg/my-pg
@@ -188,6 +189,71 @@ func (h *PGHandler) UpdatePG(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "PG updated successfully"})
+}
+
+// UploadOwnerQRCode lets a PG owner upload an image QR code for tenant payments.
+func (h *PGHandler) UploadOwnerQRCode(c *gin.Context) {
+	pgID, err := uuid.Parse(c.Param("pg_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid PG ID"})
+		return
+	}
+
+	if !h.verifyPGAccess(c, pgID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized access"})
+		return
+	}
+
+	file, err := c.FormFile("qr_code")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing QR code file"})
+		return
+	}
+
+	uploadedURL, err := h.fileUploadService.UploadQRCode(file)
+	if err != nil {
+		h.logger.Error("Failed to upload owner QR code", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.pgService.UpdateOwnerQRCode(c.Request.Context(), pgID, uploadedURL); err != nil {
+		h.logger.Error("Failed to update owner QR code", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save QR code"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Owner QR code uploaded successfully", "qr_url": uploadedURL})
+}
+
+// UploadAdminQRCode allows admin to upload a system-wide subscription payment QR code for a PG.
+func (h *PGHandler) UploadAdminQRCode(c *gin.Context) {
+	pgID, err := uuid.Parse(c.Param("pg_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid PG ID"})
+		return
+	}
+
+	file, err := c.FormFile("qr_code")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing QR code file"})
+		return
+	}
+
+	uploadedURL, err := h.fileUploadService.UploadQRCode(file)
+	if err != nil {
+		h.logger.Error("Failed to upload admin QR code", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.pgService.UpdateAdminQRCode(c.Request.Context(), pgID, uploadedURL); err != nil {
+		h.logger.Error("Failed to save admin QR code", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save admin QR code"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Admin QR code uploaded successfully", "qr_url": uploadedURL})
 }
 
 // GetRoomOccupancy - GET /v1/pg/:pg_id/rooms/occupancy

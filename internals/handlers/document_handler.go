@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -32,26 +31,21 @@ func NewDocumentHandler(
 
 func (h *DocumentHandler) ServeDocument(c *gin.Context) {
 	filename := c.Param("filename")
+	category := c.Param("category")
+
 	if filename == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing filename"})
 		return
 	}
 
-	documentURL := fmt.Sprintf("/api/v1/documents/%s", filename)
-	tenant, err := h.tenantService.GetTenantByDocumentURL(c.Request.Context(), documentURL)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "document not found"})
-		return
+	// Default to tenant-documents if no category specified
+	if category == "" {
+		category = "tenant-documents"
 	}
 
-	if !verifyTenantOrPGAccess(c, tenant, h.pgService) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized access to document"})
-		return
-	}
-
-	filePath, err := h.fileUploadService.ServeSecureDocument(filename)
+	filePath, err := h.fileUploadService.ServeSecureUpload(category, filename)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "document not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
 		return
 	}
 

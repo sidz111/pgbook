@@ -4,30 +4,35 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sidz111/pgbook/internals/models"
 	"github.com/sidz111/pgbook/internals/services"
+	"github.com/sidz111/pgbook/internals/utils"
 )
 
 type PaymentHandler struct {
-	paymentService services.PaymentService
-	tenantService  services.TenantService
-	pgService      services.PGService
-	logger         *slog.Logger
+	paymentService    services.PaymentService
+	tenantService     services.TenantService
+	pgService         services.PGService
+	fileUploadService *utils.FileUploadService
+	logger            *slog.Logger
 }
 
 func NewPaymentHandler(
 	paymentService services.PaymentService,
 	tenantService services.TenantService,
 	pgService services.PGService,
+	fileUploadService *utils.FileUploadService,
 ) *PaymentHandler {
 	return &PaymentHandler{
-		paymentService: paymentService,
-		tenantService:  tenantService,
-		pgService:      pgService,
-		logger:         slog.Default(),
+		paymentService:    paymentService,
+		tenantService:     tenantService,
+		pgService:         pgService,
+		fileUploadService: fileUploadService,
+		logger:            slog.Default(),
 	}
 }
 
@@ -37,17 +42,43 @@ type CreatePaymentRequest struct {
 	PGID          string  `json:"pg_id" binding:"required"`
 	Amount        float64 `json:"amount" binding:"required"`
 	ForMonth      string  `json:"for_month" binding:"required"`      // YYYY-MM format
-	PaymentMethod string  `json:"payment_method" binding:"required"` // "cash" or "upi_qr"
-	TransactionID string  `json:"transaction_id"`                    // For UPI/QR
+	PaymentMethod string  `json:"payment_method" binding:"required"` // "cash" or "qr"
+	TransactionID string  `json:"transaction_id"`                    // For QR / UPI
+	ProofURL      string  `json:"proof_url"`
 }
 
 // CreatePayment - POST /v1/payment/create
 // Creates payment record (status: pending initially)
 func (h *PaymentHandler) CreatePayment(c *gin.Context) {
 	var req CreatePaymentRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	proofURL := ""
+
+	if strings.Contains(c.GetHeader("Content-Type"), "multipart/form-data") {
+		req.TenantID = c.PostForm("tenant_id")
+		req.PGID = c.PostForm("pg_id")
+		req.ForMonth = c.PostForm("for_month")
+		req.PaymentMethod = c.PostForm("payment_method")
+		req.TransactionID = c.PostForm("transaction_id")
+		req.ProofURL = c.PostForm("proof_url")
+
+		if file, err := c.FormFile("proof"); err == nil {
+			uploadedURL, err := h.fileUploadService.UploadPaymentScreenshot(file)
+			if err != nil {
+				h.logger.Error("Failed to upload payment screenshot", "error", err)
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			proofURL = uploadedURL
+		}
+	} else {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	if proofURL == "" {
+		proofURL = req.ProofURL
 	}
 
 	tenantID, err := uuid.Parse(req.TenantID)
@@ -62,16 +93,15 @@ func (h *PaymentHandler) CreatePayment(c *gin.Context) {
 		return
 	}
 
-	// Verify access
-	if !verifyPGOwnerOrAdmin(c, h.pgService, pgID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized access"})
+	userID, role, err := getAuthUser(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	// Validate payment method
-	if req.PaymentMethod != "cash" && req.PaymentMethod != "upi_qr" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment method"})
-		return
+	method := strings.ToLower(req.PaymentMethod)
+	if method == "upi_qr" {
+		method = "qr"
 	}
 
 	payment := &models.Payment{
@@ -79,9 +109,36 @@ func (h *PaymentHandler) CreatePayment(c *gin.Context) {
 		PGID:          pgID,
 		Amount:        req.Amount,
 		ForMonth:      req.ForMonth,
-		Method:        req.PaymentMethod,
+		Method:        method,
 		TransactionID: req.TransactionID,
+		ProofURL:      proofURL,
 		Status:        "pending",
+	}
+
+	if role == models.RoleTenant {
+		tenant, err := h.tenantService.GetTenantByID(c.Request.Context(), tenantID)
+		if err != nil || tenant.UserID != userID || tenant.PGID != pgID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized tenant payment"})
+			return
+		}
+	} else if role == models.RoleOwner || role == models.RoleAdmin {
+		if !verifyPGOwnerOrAdmin(c, h.pgService, pgID) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized access"})
+			return
+		}
+	} else {
+		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized access"})
+		return
+	}
+
+	if method != "cash" && method != "qr" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment method"})
+		return
+	}
+
+	if proofURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payment proof screenshot is required"})
+		return
 	}
 
 	if err := h.paymentService.CreatePayment(c.Request.Context(), payment); err != nil {
@@ -90,11 +147,7 @@ func (h *PaymentHandler) CreatePayment(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message":    "Payment created successfully",
-		"payment_id": payment.ID,
-		"status":     "pending",
-	})
+	c.JSON(http.StatusCreated, gin.H{"message": "Payment created successfully", "status": "pending"})
 }
 
 // VerifyCashPayment - POST /v1/payment/:payment_id/verify-cash
@@ -188,7 +241,7 @@ func (h *PaymentHandler) VerifyUPIPayment(c *gin.Context) {
 	}
 
 	// Validate payment method
-	if payment.Method != "upi_qr" {
+	if payment.Method != "qr" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "this payment is not a UPI payment"})
 		return
 	}
@@ -424,23 +477,21 @@ func (h *PaymentHandler) GetUPIQRCode(c *gin.Context) {
 		return
 	}
 
+	if !verifyPGTenantOrAdmin(c, h.pgService, h.tenantService, pgID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized access"})
+		return
+	}
+
 	pg, err := h.pgService.GetPGByID(c.Request.Context(), pgID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "PG not found"})
 		return
 	}
 
-	if pg.ScannerURL == "" {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "UPI QR code not configured",
-			"qr_url":  "",
-		})
-		return
-	}
-
 	c.JSON(http.StatusOK, gin.H{
-		"message": "UPI QR code retrieved",
-		"qr_url":  pg.ScannerURL,
-		"note":    "Display this QR code to tenant for UPI payment",
+		"owner_qr_url":    pg.ScannerURL,
+		"admin_qr_url":    pg.AdminQRCode,
+		"payment_options": []string{"cash", "qr"},
+		"note":            "Tenant can use either cash or QR payment. Upload screenshot proof after payment.",
 	})
 }

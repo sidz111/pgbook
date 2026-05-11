@@ -14,6 +14,8 @@ type PGRepository interface {
 	GetPGByUserID(ctx context.Context, userID uuid.UUID) (*models.PG, error)
 	UpdatePG(ctx context.Context, pg *models.PG) error
 	UpdateOwnerPhoto(ctx context.Context, id uuid.UUID, photoURL string) error
+	UpdateOwnerQRCode(ctx context.Context, id uuid.UUID, qrURL string) error
+	UpdateAdminQRCode(ctx context.Context, id uuid.UUID, qrURL string) error
 	DeletePG(ctx context.Context, id uuid.UUID) error
 	GetPGStatistics(ctx context.Context, id uuid.UUID) (map[string]int64, error)
 	GetAllPGs(ctx context.Context, limit int, offset int) ([]models.PG, error)
@@ -54,6 +56,14 @@ func (r *pgRepository) UpdatePG(ctx context.Context, pg *models.PG) error {
 
 func (r *pgRepository) UpdateOwnerPhoto(ctx context.Context, id uuid.UUID, photoURL string) error {
 	return r.db.WithContext(ctx).Model(&models.PG{}).Where("id = ?", id).Update("owner_photo_url", photoURL).Error
+}
+
+func (r *pgRepository) UpdateOwnerQRCode(ctx context.Context, id uuid.UUID, qrURL string) error {
+	return r.db.WithContext(ctx).Model(&models.PG{}).Where("id = ?", id).Update("scanner_url", qrURL).Error
+}
+
+func (r *pgRepository) UpdateAdminQRCode(ctx context.Context, id uuid.UUID, qrURL string) error {
+	return r.db.WithContext(ctx).Model(&models.PG{}).Where("id = ?", id).Update("admin_qr_code", qrURL).Error
 }
 
 func (r *pgRepository) DeletePG(ctx context.Context, id uuid.UUID) error {

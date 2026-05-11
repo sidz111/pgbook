@@ -144,6 +144,7 @@ func (s *subscriptionService) ApproveSubscription(ctx context.Context, subID uui
 		return errors.New("only pending subscriptions can be approved")
 	}
 
+	// Approve subscription with extension if there is an existing active subscription
 	if err := s.subscriptionRepo.ApproveSubscription(ctx, subID, months, adminName); err != nil {
 		s.logger.Error("Failed to approve subscription", "error", err, "subscription_id", subID)
 		return errors.New("failed to approve subscription")

@@ -31,14 +31,12 @@ func NewFileUploadService(config FileStorageConfig) *FileUploadService {
 	return &FileUploadService{config: config}
 }
 
-// UploadTenantDocument uploads tenant ID proof or photo
+// UploadTenantDocument uploads tenant identity documents and allows PDF proofs
 func (f *FileUploadService) UploadTenantDocument(file *multipart.FileHeader, docType string) (string, error) {
-	// Validate file size
 	if file.Size > f.config.MaxFileSize {
 		return "", errors.New("file size exceeds maximum allowed")
 	}
 
-	// Validate file type
 	allowedTypes := map[string]bool{
 		"image/jpeg":      true,
 		"image/png":       true,
@@ -50,13 +48,12 @@ func (f *FileUploadService) UploadTenantDocument(file *multipart.FileHeader, doc
 		return "", errors.New("invalid file type - only JPEG, PNG, PDF allowed")
 	}
 
-	// Generate secure filename using UUID
 	fileExt := filepath.Ext(file.Filename)
 	secureFilename := fmt.Sprintf("%s_%s%s", docType, uuid.New().String(), fileExt)
 
 	switch f.config.StorageType {
 	case "local":
-		return f.uploadLocal(file, secureFilename)
+		return f.uploadLocalToCategory(file, secureFilename, "tenant-documents")
 	case "s3":
 		return f.uploadS3(file, secureFilename)
 	default:
@@ -64,10 +61,62 @@ func (f *FileUploadService) UploadTenantDocument(file *multipart.FileHeader, doc
 	}
 }
 
-// uploadLocal saves file to local storage
-func (f *FileUploadService) uploadLocal(file *multipart.FileHeader, filename string) (string, error) {
+// UploadPaymentScreenshot uploads payment screenshot
+func (f *FileUploadService) UploadPaymentScreenshot(file *multipart.FileHeader) (string, error) {
+	return f.UploadFile(file, "payment-screenshots")
+}
+
+// UploadSubscriptionProof uploads subscription payment proof
+func (f *FileUploadService) UploadSubscriptionProof(file *multipart.FileHeader) (string, error) {
+	return f.UploadFile(file, "subscription-proofs")
+}
+
+// UploadProfilePhoto uploads user profile photo
+func (f *FileUploadService) UploadProfilePhoto(file *multipart.FileHeader) (string, error) {
+	return f.UploadFile(file, "profile-photos")
+}
+
+// UploadQRCode uploads QR code image
+func (f *FileUploadService) UploadQRCode(file *multipart.FileHeader) (string, error) {
+	return f.UploadFile(file, "qr-codes")
+}
+
+// UploadFile uploads file to specified category folder
+func (f *FileUploadService) UploadFile(file *multipart.FileHeader, category string) (string, error) {
+	// Validate file size
+	if file.Size > f.config.MaxFileSize {
+		return "", errors.New("file size exceeds maximum allowed")
+	}
+
+	// Validate file type (images only for most categories)
+	allowedTypes := map[string]bool{
+		"image/jpeg": true,
+		"image/png":  true,
+		"image/jpg":  true,
+	}
+
+	if !allowedTypes[file.Header.Get("Content-Type")] {
+		return "", errors.New("invalid file type - only JPEG, PNG allowed")
+	}
+
+	// Generate secure filename using UUID
+	fileExt := filepath.Ext(file.Filename)
+	secureFilename := fmt.Sprintf("%s_%s%s", category, uuid.New().String(), fileExt)
+
+	switch f.config.StorageType {
+	case "local":
+		return f.uploadLocalToCategory(file, secureFilename, category)
+	case "s3":
+		return f.uploadS3(file, secureFilename)
+	default:
+		return "", errors.New("unsupported storage type")
+	}
+}
+
+// uploadLocalToCategory saves file to local storage in specific category folder
+func (f *FileUploadService) uploadLocalToCategory(file *multipart.FileHeader, filename string, category string) (string, error) {
 	// Create directory if not exists
-	uploadDir := filepath.Join(f.config.LocalPath, "tenant-documents")
+	uploadDir := filepath.Join(f.config.LocalPath, category)
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create upload directory: %w", err)
 	}
@@ -93,7 +142,7 @@ func (f *FileUploadService) uploadLocal(file *multipart.FileHeader, filename str
 	}
 
 	// Return secure path (not exposing full filesystem path)
-	return fmt.Sprintf("/api/v1/documents/%s", filename), nil
+	return fmt.Sprintf("/api/v1/uploads/%s/%s", category, filename), nil
 }
 
 // uploadS3 uploads file to S3 bucket (placeholder for AWS SDK integration)
@@ -108,15 +157,25 @@ func (f *FileUploadService) GetDocumentPath(filename string) string {
 	return fmt.Sprintf("/api/v1/documents/%s", filename)
 }
 
+// GetUploadPath constructs secure upload access path for specific category
+func (f *FileUploadService) GetUploadPath(category, filename string) string {
+	return fmt.Sprintf("/api/v1/uploads/%s/%s", category, filename)
+}
+
 // ServeSecureDocument serves document with access control
 // Should be called from handler after permission check
 func (f *FileUploadService) ServeSecureDocument(filename string) (string, error) {
+	return f.ServeSecureUpload("tenant-documents", filename)
+}
+
+// ServeSecureUpload serves uploaded file with access control
+func (f *FileUploadService) ServeSecureUpload(category, filename string) (string, error) {
 	if f.config.StorageType == "local" {
-		filepath := filepath.Join(f.config.LocalPath, "tenant-documents", filename)
+		filepath := filepath.Join(f.config.LocalPath, category, filename)
 
 		// Validate file exists
 		if _, err := os.Stat(filepath); os.IsNotExist(err) {
-			return "", errors.New("document not found")
+			return "", errors.New("file not found")
 		}
 
 		return filepath, nil
@@ -125,10 +184,15 @@ func (f *FileUploadService) ServeSecureDocument(filename string) (string, error)
 	return "", errors.New("S3 retrieval not yet implemented")
 }
 
-// DeleteDocument removes uploaded document
+// DeleteDocument removes uploaded document (legacy)
 func (f *FileUploadService) DeleteDocument(filename string) error {
+	return f.DeleteUpload("tenant-documents", filename)
+}
+
+// DeleteUpload removes uploaded file from specific category
+func (f *FileUploadService) DeleteUpload(category, filename string) error {
 	if f.config.StorageType == "local" {
-		filepath := filepath.Join(f.config.LocalPath, "tenant-documents", filename)
+		filepath := filepath.Join(f.config.LocalPath, category, filename)
 		return os.Remove(filepath)
 	}
 

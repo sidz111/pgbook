@@ -54,8 +54,16 @@ func (r *subscriptionRepository) ApproveSubscription(ctx context.Context, subID 
 			return err
 		}
 
+		// Determine base date for extension from any active subscription for the PG
 		now := time.Now()
-		expiry := now.AddDate(0, months, 0)
+		expiryBase := now
+
+		var activeSub models.Subscription
+		if err := tx.Where("pg_id = ? AND status = ?", sub.PGID, "active").Order("expiry_date desc").First(&activeSub).Error; err == nil && activeSub.ExpiryDate != nil && activeSub.ExpiryDate.After(now) {
+			expiryBase = *activeSub.ExpiryDate
+		}
+
+		expiry := expiryBase.AddDate(0, months, 0)
 		verifiedAt := now
 
 		// 1. Subscription status update

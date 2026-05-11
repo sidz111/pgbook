@@ -34,10 +34,10 @@ func RegisterRoutes(
 
 	// Initialize handlers
 	authHandler := NewAuthHandler(authService)
-	pgHandler := NewPGHandler(pgService, roomService, tenantService, subscriptionService)
+	pgHandler := NewPGHandler(pgService, roomService, tenantService, subscriptionService, fileUploadService)
 	roomHandler := NewRoomHandler(roomService, pgService)
 	tenantHandler := NewTenantHandler(tenantService, roomService, pgService, fileUploadService)
-	paymentHandler := NewPaymentHandler(paymentService, tenantService, pgService)
+	paymentHandler := NewPaymentHandler(paymentService, tenantService, pgService, fileUploadService)
 	subscriptionHandler := NewSubscriptionHandler(subscriptionService, pgService, fileUploadService)
 
 	// Public routes (no authentication)
@@ -97,12 +97,15 @@ func RegisterRoutes(
 			// Payment routes under PG
 			payments := pg.Group("/:pg_id/payments")
 			{
-				payments.POST("", authHandler.checkOwnerOrAdmin(paymentHandler.CreatePayment))
+				payments.POST("", paymentHandler.CreatePayment)
 				payments.GET("/pending", authHandler.checkOwnerOrAdmin(paymentHandler.GetPendingPayments))
 				payments.GET("/stats", authHandler.checkOwnerOrAdmin(paymentHandler.GetPaymentStats))
 				payments.GET("/monthly", authHandler.checkOwnerOrAdmin(paymentHandler.GetMonthlyStats))
-				payments.GET("/upi-qr", paymentHandler.GetUPIQRCode)
+				payments.GET("/qr-codes", paymentHandler.GetUPIQRCode)
 			}
+
+			// QR code upload and view for payments
+			pg.POST("/:pg_id/qr/owner-upload", authHandler.checkOwnerRole(pgHandler.UploadOwnerQRCode))
 
 			// Subscription routes under PG
 			subscriptions := pg.Group("/:pg_id/subscription")
@@ -117,6 +120,7 @@ func RegisterRoutes(
 			adminPG.Use(authHandler.adminOnly)
 			{
 				adminPG.GET("/list", pgHandler.ListAllPGs)
+				adminPG.POST("/:pg_id/admin-qr/upload", pgHandler.UploadAdminQRCode)
 			}
 		}
 
@@ -137,6 +141,9 @@ func RegisterRoutes(
 				files.POST("/upload-photo", tenantHandler.UploadProfilePhoto)
 				files.POST("/upload-id-proof", tenantHandler.UploadIDProof)
 			}
+
+			// Monthly payment creation by owners/admins
+			tenant.POST("/:tenant_id/payment/monthly", paymentHandler.InitiateMonthlyPayment)
 
 			// Notice period
 			notice := tenant.Group("/:tenant_id")
@@ -173,6 +180,12 @@ func RegisterRoutes(
 		documents := protected.Group("/documents")
 		{
 			documents.GET("/:filename", NewDocumentHandler(fileUploadService, tenantService, pgService).ServeDocument)
+		}
+
+		// Upload access (secure)
+		uploads := protected.Group("/uploads")
+		{
+			uploads.GET("/:category/:filename", NewDocumentHandler(fileUploadService, tenantService, pgService).ServeDocument)
 		}
 	}
 

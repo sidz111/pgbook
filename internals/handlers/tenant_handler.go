@@ -136,10 +136,7 @@ func (h *TenantHandler) SelfRegisterTenant(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message":   "Tenant registration submitted for approval",
-		"tenant_id": tenant.ID,
-	})
+	c.JSON(http.StatusCreated, gin.H{"message": "Tenant registration submitted for approval"})
 }
 
 func (h *TenantHandler) GetTenantByCurrentUser(c *gin.Context) {
@@ -443,7 +440,7 @@ func (h *TenantHandler) UploadProfilePhoto(c *gin.Context) {
 	}
 
 	// Upload file
-	filePath, err := h.fileUploadService.UploadTenantDocument(file, "photo")
+	filePath, err := h.fileUploadService.UploadProfilePhoto(file)
 	if err != nil {
 		h.logger.Error("Failed to upload photo", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

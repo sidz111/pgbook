@@ -15,7 +15,7 @@ type Room struct {
 	Occupied    int8      `gorm:"type:tinyint;default:0" json:"occupied"`
 	RentAmount  float64   `gorm:"type:decimal(10,2)" json:"rent_amount"`
 
-	Tenants []Tenant `gorm:"foreignKey:RoomID" json:"tenants"`
+	Tenants []Tenant `gorm:"foreignKey:RoomID" json:"tenants,omitempty"`
 }
 
 func (r *Room) BeforeCreate(tx *gorm.DB) (err error) {

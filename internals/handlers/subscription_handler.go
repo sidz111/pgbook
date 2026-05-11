@@ -125,7 +125,7 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Subscription request created", "subscription_id": subscription.ID})
+	c.JSON(http.StatusCreated, gin.H{"message": "Subscription request created"})
 }
 
 func (h *SubscriptionHandler) ApproveSubscription(c *gin.Context) {

@@ -17,6 +17,7 @@ type AuthService interface {
 	Login(ctx context.Context, email, password string) (string, string, *models.User, error)
 	RefreshToken(ctx context.Context, refreshToken string) (string, error)
 	Logout(ctx context.Context, userID string) error
+	GetProfile(ctx context.Context, userID uuid.UUID) (*models.User, error)
 }
 
 type authService struct {
@@ -99,6 +100,19 @@ func (s *authService) Logout(ctx context.Context, userID string) error {
 	}
 	user.RefreshToken = ""
 	return s.userRepo.UpdateUser(ctx, user)
+}
+
+func (s *authService) GetProfile(ctx context.Context, userID uuid.UUID) (*models.User, error) {
+	if userID == uuid.Nil {
+		return nil, errors.New("invalid user ID")
+	}
+
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, errors.New("user not found")
+	}
+
+	return user, nil
 }
 
 func (s *authService) generateToken(userID, role string, expiry time.Duration) (string, error) {

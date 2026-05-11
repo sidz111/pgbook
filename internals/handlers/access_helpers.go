@@ -83,6 +83,36 @@ func verifyTenantOrPGAccess(c *gin.Context, tenant *models.Tenant, pgSvc service
 	return verifyPGOwnerOrAdmin(c, pgSvc, tenant.PGID)
 }
 
+func verifyPGTenantOrAdmin(c *gin.Context, pgSvc services.PGService, tenantSvc services.TenantService, pgID uuid.UUID) bool {
+	if pgID == uuid.Nil {
+		return false
+	}
+
+	if isAdmin(c) {
+		return true
+	}
+
+	userID, role, err := getAuthUser(c)
+	if err != nil {
+		return false
+	}
+
+	if role == models.RoleOwner {
+		pg, err := pgSvc.GetPGByID(c.Request.Context(), pgID)
+		if err != nil {
+			return false
+		}
+		return pg.UserID == userID
+	}
+
+	if role == models.RoleTenant {
+		_, err := tenantSvc.GetTenantByUserIDAndPG(c.Request.Context(), userID, pgID)
+		return err == nil
+	}
+
+	return false
+}
+
 func verifyTenantSelfOrOwner(c *gin.Context, tenant *models.Tenant, pgSvc services.PGService) bool {
 	return verifyTenantOrPGAccess(c, tenant, pgSvc)
 }

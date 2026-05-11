@@ -129,6 +129,7 @@ async function initOwner() {
         loadPendingPayments(),
         loadStats(),
         loadSubscription(),
+        loadQRCodes(currentPGId, "qrCodesInfo"),
       ]);
     } catch (err) {
       showMessage("ownerMessage", err.message, "error");
@@ -309,6 +310,35 @@ async function initOwner() {
     } catch (err) {
       document.getElementById("subscriptionInfo").innerHTML =
         `<p>${err.message}</p>`;
+    }
+  }
+
+  async function loadQRCodes(pgId, containerId) {
+    if (!pgId) return;
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    try {
+      const qr = await apiFetch(`/pg/${pgId}/payments/qr-codes`);
+      const ownerQRCode = qr.owner_qr_url
+        ? `<img class="qr-image" src="${qr.owner_qr_url}" alt="Owner QR Code" />`
+        : `<p>No owner QR code uploaded yet.</p>`;
+      const adminQRCode = qr.admin_qr_url
+        ? `<img class="qr-image" src="${qr.admin_qr_url}" alt="Admin QR Code" />`
+        : `<p>No admin QR code uploaded yet.</p>`;
+
+      container.innerHTML = `
+        <div class="qr-section">
+          <h3>Owner Payment QR</h3>
+          ${ownerQRCode}
+        </div>
+        <div class="qr-section">
+          <h3>Admin Subscription QR</h3>
+          ${adminQRCode}
+        </div>
+      `;
+    } catch (err) {
+      container.innerHTML = `<p>${err.message}</p>`;
     }
   }
 
@@ -608,6 +638,7 @@ async function initTenant() {
         <p><strong>Room:</strong> ${tenant.room_id || "not assigned"}</p>
         <p><strong>Joining Date:</strong> ${tenant.joining_date || "N/A"}</p>
       `;
+      await loadQRCodes(tenant.pg_id, "tenantQrCodes");
       const payments = await apiFetch(`/tenant/${tenant.id}/payments`);
       tenantPayments.innerHTML = payments.length
         ? payments
@@ -698,6 +729,7 @@ async function initTenant() {
         <p><strong>Room:</strong> ${tenant.room_id}</p>
         <p><strong>Status:</strong> ${tenant.status || "unknown"}</p>
       `;
+      await loadQRCodes(tenant.pg_id, "tenantQrCodes");
       const payments = await apiFetch(`/tenant/${currentTenantId}/payments`);
       tenantPayments.innerHTML = payments.length
         ? payments
@@ -819,6 +851,7 @@ async function initTenantProfile() {
         <p><strong>Room ID:</strong> ${tenant.room_id || "not assigned"}</p>
         <p><strong>Joining Date:</strong> ${tenant.joining_date || "N/A"}</p>
       `;
+      await loadQRCodes(tenant.pg_id, "qrCodesInfo");
       const payments = await apiFetch(`/tenant/${tenant.id}/payments`);
       tenantPayments.innerHTML = payments.length
         ? payments

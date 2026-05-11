@@ -10,9 +10,9 @@ import (
 type Tenant struct {
 	gorm.Model
 	ID                uuid.UUID  `gorm:"type:char(36);primaryKey" json:"id"`
-	UserID            uuid.UUID  `gorm:"type:char(36);index;not null" json:"user_id"` // User Table Link
+	UserID            uuid.UUID  `gorm:"type:char(36);index;not null" json:"-"`
 	PGID              uuid.UUID  `gorm:"type:char(36);index;not null" json:"pg_id"`
-	RoomID            *uuid.UUID `gorm:"type:char(36);index" json:"room_id"` // Nullable for pending approval
+	RoomID            *uuid.UUID `gorm:"type:char(36);index" json:"room_id"`
 	FirstName         string     `gorm:"type:varchar(50);not null" json:"first_name"`
 	LastName          string     `gorm:"type:varchar(50)" json:"last_name"`
 	Phone             string     `gorm:"type:varchar(15);not null" json:"phone"`
@@ -27,7 +27,7 @@ type Tenant struct {
 	NoticePeriodDays  int        `gorm:"default:30" json:"notice_period_days"`
 	ExitDate          *time.Time `json:"exit_date"`
 
-	Payments []Payment `gorm:"foreignKey:TenantID" json:"payments"`
+	Payments []Payment `gorm:"foreignKey:TenantID" json:"payments,omitempty"`
 }
 
 func (t *Tenant) GetRemainingDays() int {

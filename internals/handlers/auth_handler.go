@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/sidz111/pgbook/internals/models"
 	"github.com/sidz111/pgbook/internals/services"
 )
@@ -206,10 +207,23 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		return
 	}
 
-	role := c.GetString("role")
+	uuidUserID, err := uuid.Parse(userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	user, err := h.service.GetProfile(c.Request.Context(), uuidUserID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user profile not found"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"user_id": userID,
-		"role":    role,
+		"user_id":       user.ID.String(),
+		"name":          user.Name,
+		"email":         user.Email,
+		"role":          user.Role,
+		"profile_photo": user.ProfilePhoto,
 	})
 }

@@ -19,6 +19,9 @@ type PGService interface {
 	UpdatePG(ctx context.Context, pg *models.PG) error
 	DeletePG(ctx context.Context, id uuid.UUID) error
 	UpdateOwnerPhoto(ctx context.Context, pgID uuid.UUID, photoURL string) error
+	UpdateOwnerQRCode(ctx context.Context, pgID uuid.UUID, qrURL string) error
+	UpdateAdminQRCode(ctx context.Context, pgID uuid.UUID, qrURL string) error
+	GetPGQRCodes(ctx context.Context, pgID uuid.UUID) (map[string]string, error)
 
 	// PG Management
 	GetAllPGs(ctx context.Context, limit int, offset int) ([]models.PG, error)
@@ -188,6 +191,60 @@ func (s *pgService) UpdateOwnerPhoto(ctx context.Context, pgID uuid.UUID, photoU
 
 	s.logger.Info("Owner photo updated", "pg_id", pgID)
 	return nil
+}
+
+// UpdateOwnerQRCode updates the PG owner's QR code used for tenant payments
+func (s *pgService) UpdateOwnerQRCode(ctx context.Context, pgID uuid.UUID, qrURL string) error {
+	if pgID == uuid.Nil {
+		return errors.New("invalid PG ID")
+	}
+	if qrURL == "" {
+		return errors.New("QR code URL is required")
+	}
+
+	if err := s.pgRepo.UpdateOwnerQRCode(ctx, pgID, qrURL); err != nil {
+		s.logger.Error("Failed to update owner QR code", "error", err, "pg_id", pgID)
+		return errors.New("failed to save owner QR code")
+	}
+
+	s.logger.Info("Owner QR code updated", "pg_id", pgID)
+	return nil
+}
+
+// UpdateAdminQRCode updates the admin subscription QR code for the PG
+func (s *pgService) UpdateAdminQRCode(ctx context.Context, pgID uuid.UUID, qrURL string) error {
+	if pgID == uuid.Nil {
+		return errors.New("invalid PG ID")
+	}
+	if qrURL == "" {
+		return errors.New("QR code URL is required")
+	}
+
+	if err := s.pgRepo.UpdateAdminQRCode(ctx, pgID, qrURL); err != nil {
+		s.logger.Error("Failed to update admin QR code", "error", err, "pg_id", pgID)
+		return errors.New("failed to save admin QR code")
+	}
+
+	s.logger.Info("Admin QR code updated", "pg_id", pgID)
+	return nil
+}
+
+// GetPGQRCodes returns configured QR code urls for owner and admin payments
+func (s *pgService) GetPGQRCodes(ctx context.Context, pgID uuid.UUID) (map[string]string, error) {
+	if pgID == uuid.Nil {
+		return nil, errors.New("invalid PG ID")
+	}
+
+	pg, err := s.pgRepo.GetPGByID(ctx, pgID)
+	if err != nil {
+		s.logger.Error("Failed to get PG QR codes", "error", err, "pg_id", pgID)
+		return nil, errors.New("PG not found")
+	}
+
+	return map[string]string{
+		"owner_qr_url": pg.ScannerURL,
+		"admin_qr_url": pg.AdminQRCode,
+	}, nil
 }
 
 // GetAllPGs retrieves all PGs with pagination
