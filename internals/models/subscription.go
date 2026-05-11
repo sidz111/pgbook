@@ -15,9 +15,9 @@ type Subscription struct {
 	Amount     float64    `gorm:"type:decimal(10,2)" json:"amount"`
 	ProofURL   string     `gorm:"type:varchar(255)" json:"proof_url"`
 	Status     string     `gorm:"type:varchar(20);default:'pending'" json:"status"` // pending, active, rejected
-	StartDate  time.Time  `json:"start_date"`
-	ExpiryDate time.Time  `json:"expiry_date"`
-	VerifiedAt *time.Time `json:"verified_at"`
+	StartDate  *time.Time `gorm:"type:datetime;null" json:"start_date"`
+	ExpiryDate *time.Time `gorm:"type:datetime;null" json:"expiry_date"`
+	VerifiedAt *time.Time `gorm:"type:datetime;null" json:"verified_at"`
 	VerifiedBy string     `json:"verified_by"` // Admin name/ID
 }
 

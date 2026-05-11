@@ -75,7 +75,8 @@ func (s *subscriptionService) CreateSubscription(ctx context.Context, subscripti
 
 	subscription.ID = uuid.New()
 	subscription.Status = "pending"
-	subscription.StartDate = time.Now()
+	subscription.StartDate = nil
+	subscription.ExpiryDate = nil
 
 	// Set default plan name if not provided
 	if subscription.PlanName == "" {
@@ -189,7 +190,7 @@ func (s *subscriptionService) GetActiveSubscription(ctx context.Context, pgID uu
 
 	now := time.Now()
 	for _, sub := range subscriptions {
-		if sub.Status == "active" && sub.ExpiryDate.After(now) {
+		if sub.Status == "active" && sub.ExpiryDate != nil && sub.ExpiryDate.After(now) {
 			return &sub, nil
 		}
 	}
@@ -222,7 +223,7 @@ func (s *subscriptionService) GetSubscriptionStatus(ctx context.Context, subID u
 		return "", errors.New("subscription not found")
 	}
 
-	if subscription.Status == "active" && subscription.ExpiryDate.Before(time.Now()) {
+	if subscription.Status == "active" && subscription.ExpiryDate != nil && subscription.ExpiryDate.Before(time.Now()) {
 		return "expired", nil
 	}
 
@@ -244,6 +245,10 @@ func (s *subscriptionService) RenewSubscription(ctx context.Context, pgID uuid.U
 		return errors.New("no active subscription to renew")
 	}
 
+	if currentSub.ExpiryDate == nil {
+		return errors.New("current subscription expiry date is missing")
+	}
+
 	// Create new subscription record
 	newSub := &models.Subscription{
 		PGID:      pgID,
@@ -253,7 +258,8 @@ func (s *subscriptionService) RenewSubscription(ctx context.Context, pgID uuid.U
 		StartDate: currentSub.ExpiryDate,
 	}
 
-	newSub.ExpiryDate = currentSub.ExpiryDate.AddDate(0, months, 0)
+	nextExpiry := currentSub.ExpiryDate.AddDate(0, months, 0)
+	newSub.ExpiryDate = &nextExpiry
 	now := time.Now()
 	newSub.VerifiedAt = &now
 	newSub.VerifiedBy = adminName

@@ -294,6 +294,7 @@ func (s *pgService) ActivateTrial(ctx context.Context, pgID uuid.UUID) error {
 
 	// Create 1-month free trial subscription
 	now := time.Now()
+	expiry := now.AddDate(0, 1, 0)
 	trialSubscription := &models.Subscription{
 		ID:         uuid.New(),
 		PGID:       pgID,
@@ -301,8 +302,8 @@ func (s *pgService) ActivateTrial(ctx context.Context, pgID uuid.UUID) error {
 		Amount:     0,
 		ProofURL:   "",
 		Status:     "active",
-		StartDate:  now,
-		ExpiryDate: now.AddDate(0, 1, 0), // 1 month from now
+		StartDate:  &now,
+		ExpiryDate: &expiry,
 		VerifiedAt: &now,
 		VerifiedBy: "system",
 	}
@@ -314,7 +315,7 @@ func (s *pgService) ActivateTrial(ctx context.Context, pgID uuid.UUID) error {
 
 	// Mark PG as subscribed
 	pg.IsSubscribed = true
-	pg.TrialEndsAt = &trialSubscription.ExpiryDate
+	pg.TrialEndsAt = trialSubscription.ExpiryDate
 	if err := s.pgRepo.UpdatePG(ctx, pg); err != nil {
 		s.logger.Error("Failed to update PG subscription status", "error", err, "pg_id", pgID)
 	}
