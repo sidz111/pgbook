@@ -91,6 +91,7 @@ func RegisterRoutes(
 				tenants.POST("", authHandler.checkOwnerOrAdmin(tenantHandler.CreateTenant))
 				tenants.GET("", authHandler.checkOwnerOrAdmin(tenantHandler.ListTenants))
 				tenants.POST("/:tenant_id/approve", authHandler.checkOwnerOrAdmin(tenantHandler.ApproveTenant))
+				tenants.POST("/:tenant_id/reject", authHandler.checkOwnerOrAdmin(tenantHandler.RejectTenant))
 			}
 
 			// Payment routes under PG
@@ -122,6 +123,8 @@ func RegisterRoutes(
 		// Tenant Routes
 		tenant := protected.Group("/tenant")
 		{
+			tenant.GET("/me", tenantHandler.GetTenantByCurrentUser)
+			tenant.PUT("/me", tenantHandler.UpdateCurrentTenant)
 			tenant.GET("/pgs/available", pgHandler.ListAllAvailablePGs)
 			tenant.POST("/self-register", tenantHandler.SelfRegisterTenant)
 			tenant.GET("/:tenant_id", tenantHandler.GetTenantDetails)

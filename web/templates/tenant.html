@@ -62,6 +62,31 @@
         </form>
       </section>
 
+      <section
+        id="tenantUpdateSection"
+        class="panel form-panel"
+        style="display: none"
+      >
+        <h2>Update Tenant Profile</h2>
+        <form id="tenantProfileForm" class="form-grid">
+          <label for="firstNameUpdate">First Name</label>
+          <input id="firstNameUpdate" name="first_name" />
+          <label for="lastNameUpdate">Last Name</label>
+          <input id="lastNameUpdate" name="last_name" />
+          <label for="phoneUpdate">Phone</label>
+          <input id="phoneUpdate" name="phone" />
+          <label for="idProofTypeUpdate">ID Proof Type</label>
+          <select id="idProofTypeUpdate" name="id_proof_type">
+            <option value="">-- Select ID Type --</option>
+            <option value="Aadhaar">Aadhaar</option>
+            <option value="PAN">PAN</option>
+            <option value="Passport">Passport</option>
+            <option value="Driving License">Driving License</option>
+          </select>
+          <button type="submit" class="btn btn-primary">Update Profile</button>
+        </form>
+      </section>
+
       <section class="panel">
         <h2>Tenant Details</h2>
         <div id="tenantInfo"></div>

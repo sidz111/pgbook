@@ -3,6 +3,7 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -65,21 +66,31 @@ func (h *TenantHandler) SelfRegisterTenant(c *gin.Context) {
 		return
 	}
 
-	var req TenantSelfRegisterRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	userUUID, err := uuid.Parse(userID.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
 		return
+	}
+
+	var req TenantSelfRegisterRequest
+	isMultipart := strings.Contains(c.GetHeader("Content-Type"), "multipart/form-data")
+	if isMultipart {
+		req.PGID = c.PostForm("pg_id")
+		req.FirstName = c.PostForm("first_name")
+		req.LastName = c.PostForm("last_name")
+		req.Phone = c.PostForm("phone")
+		req.JoiningDate = c.PostForm("joining_date")
+		req.IDProofType = c.PostForm("id_proof_type")
+	} else {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	pgID, err := uuid.Parse(req.PGID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid PG ID"})
-		return
-	}
-
-	userUUID, err := uuid.Parse(userID.(string))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
 		return
 	}
 
@@ -98,8 +109,25 @@ func (h *TenantHandler) SelfRegisterTenant(c *gin.Context) {
 		PGID:             pgID,
 		JoiningDate:      joiningDate,
 		IDProofType:      req.IDProofType,
-		Status:           "pending_approval", // New status for approval
+		Status:           "pending_approval",
 		NoticePeriodDays: 30,
+	}
+
+	if isMultipart {
+		if file, err := c.FormFile("id_proof"); err == nil {
+			uploadedURL, err := h.fileUploadService.UploadTenantDocument(file, "tenant_id_proof")
+			if err != nil {
+				h.logger.Error("Failed to upload ID proof", "error", err)
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			tenant.IDProofURL = uploadedURL
+		}
+	}
+
+	if existing, err := h.tenantService.GetTenantByUserIDAndPG(c.Request.Context(), userUUID, pgID); err == nil && existing != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "You have already submitted a request for this PG"})
+		return
 	}
 
 	if err := h.tenantService.CreateTenant(c.Request.Context(), tenant); err != nil {
@@ -113,6 +141,108 @@ func (h *TenantHandler) SelfRegisterTenant(c *gin.Context) {
 		"tenant_id": tenant.ID,
 	})
 }
+
+func (h *TenantHandler) GetTenantByCurrentUser(c *gin.Context) {
+	userIDValue, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userUUID, err := uuid.Parse(userIDValue.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	tenant, err := h.tenantService.GetTenantByUserID(c.Request.Context(), userUUID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant profile not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, tenant)
+}
+
+func (h *TenantHandler) UpdateCurrentTenant(c *gin.Context) {
+	userIDValue, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userUUID, err := uuid.Parse(userIDValue.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	tenant, err := h.tenantService.GetTenantByUserID(c.Request.Context(), userUUID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant profile not found"})
+		return
+	}
+
+	var req struct {
+		FirstName   string `json:"first_name"`
+		LastName    string `json:"last_name"`
+		Phone       string `json:"phone"`
+		IDProofType string `json:"id_proof_type"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.FirstName != "" {
+		tenant.FirstName = req.FirstName
+	}
+	if req.LastName != "" {
+		tenant.LastName = req.LastName
+	}
+	if req.Phone != "" {
+		tenant.Phone = req.Phone
+	}
+	if req.IDProofType != "" {
+		tenant.IDProofType = req.IDProofType
+	}
+
+	if err := h.tenantService.UpdateTenant(c.Request.Context(), tenant); err != nil {
+		h.logger.Error("Failed to update tenant profile", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Tenant profile updated successfully"})
+}
+
+func (h *TenantHandler) RejectTenant(c *gin.Context) {
+	pgID, err := uuid.Parse(c.Param("pg_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid PG ID"})
+		return
+	}
+
+	tenantID, err := uuid.Parse(c.Param("tenant_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tenant ID"})
+		return
+	}
+
+	if !verifyPGOwnerOrAdmin(c, h.pgService, pgID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized access"})
+		return
+	}
+
+	if err := h.tenantService.RejectTenant(c.Request.Context(), tenantID); err != nil {
+		h.logger.Error("Failed to reject tenant", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Tenant request rejected"})
+}
+
 func (h *TenantHandler) ApproveTenant(c *gin.Context) {
 	pgID, err := uuid.Parse(c.Param("pg_id"))
 	if err != nil {

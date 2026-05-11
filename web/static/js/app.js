@@ -240,6 +240,18 @@ async function initOwner() {
           }
         });
       });
+
+      window.rejectTenant = async (tenantId) => {
+        try {
+          await apiFetch(`/pg/${currentPGId}/tenants/${tenantId}/reject`, {
+            method: "POST",
+          });
+          showMessage("ownerMessage", "Tenant request rejected.");
+          await loadTenantRequests();
+        } catch (err) {
+          showMessage("ownerMessage", err.message, "error");
+        }
+      };
     } catch (err) {
       document.getElementById("tenantRequests").innerHTML =
         `<p>${err.message}</p>`;
@@ -575,39 +587,97 @@ async function initTenant() {
 
   // Handle tenant self-registration
   const registerForm = document.getElementById("tenantRegisterForm");
+  const tenantInfo = document.getElementById("tenantInfo");
+  const tenantPayments = document.getElementById("tenantPayments");
+  const tenantUpdateSection = document.getElementById("tenantUpdateSection");
+
+  async function loadCurrentTenant() {
+    try {
+      const tenant = await apiFetch("/tenant/me");
+      if (registerForm) {
+        registerForm.style.display = "none";
+      }
+      if (tenantUpdateSection) {
+        tenantUpdateSection.style.display = "block";
+      }
+      tenantInfo.innerHTML = `
+        <p><strong>${tenant.first_name} ${tenant.last_name}</strong></p>
+        <p><strong>Phone:</strong> ${tenant.phone}</p>
+        <p><strong>Status:</strong> ${tenant.status || "pending"}</p>
+        <p><strong>PG:</strong> ${tenant.pg_id || "N/A"}</p>
+        <p><strong>Room:</strong> ${tenant.room_id || "not assigned"}</p>
+        <p><strong>Joining Date:</strong> ${tenant.joining_date || "N/A"}</p>
+      `;
+      const payments = await apiFetch(`/tenant/${tenant.id}/payments`);
+      tenantPayments.innerHTML = payments.length
+        ? payments
+            .map(
+              (p) =>
+                `<div class="item-card"><strong>${p.month || p.method}</strong> • ${p.amount} • ${p.status}</div>`,
+            )
+            .join("")
+        : "<p>No payments found.</p>";
+    } catch (err) {
+      if (registerForm) {
+        registerForm.style.display = "block";
+      }
+      if (tenantUpdateSection) {
+        tenantUpdateSection.style.display = "none";
+      }
+    }
+  }
+
   if (registerForm) {
-    // Load PGs when form is displayed
     loadAvailablePGs();
 
     registerForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const payload = {
-        pg_id: registerForm.pg_id.value,
-        first_name: registerForm.first_name.value,
-        last_name: registerForm.last_name.value,
-        phone: registerForm.phone.value,
-        joining_date: registerForm.joining_date.value,
-        id_proof_type: registerForm.id_proof_type.value,
-      };
+      const file = document.getElementById("idProof")?.files?.[0];
+      let body;
+      let formData = false;
+
+      if (file) {
+        body = new FormData();
+        body.append("pg_id", registerForm.pg_id.value);
+        body.append("first_name", registerForm.first_name.value);
+        body.append("last_name", registerForm.last_name.value);
+        body.append("phone", registerForm.phone.value);
+        body.append("joining_date", registerForm.joining_date.value);
+        body.append("id_proof_type", registerForm.id_proof_type.value);
+        body.append("id_proof", file);
+        formData = true;
+      } else {
+        body = {
+          pg_id: registerForm.pg_id.value,
+          first_name: registerForm.first_name.value,
+          last_name: registerForm.last_name.value,
+          phone: registerForm.phone.value,
+          joining_date: registerForm.joining_date.value,
+          id_proof_type: registerForm.id_proof_type.value,
+        };
+      }
+
       try {
         const result = await apiFetch("/tenant/self-register", {
           method: "POST",
-          body: payload,
+          body,
+          formData,
         });
         showMessage(
           "tenantMessage",
           result.message || "Registration submitted successfully",
         );
         registerForm.reset();
+        await loadCurrentTenant();
       } catch (err) {
         showMessage("tenantMessage", err.message, "error");
       }
     });
   }
 
+  await loadCurrentTenant();
+
   const tenantForm = document.getElementById("tenantLookupForm");
-  const tenantInfo = document.getElementById("tenantInfo");
-  const tenantPayments = document.getElementById("tenantPayments");
   const message = document.getElementById("tenantMessage");
   let currentTenantId = null;
 
@@ -659,7 +729,10 @@ async function initTenant() {
       if (!currentTenantId)
         return showMessage("tenantMessage", "Load a tenant first.", "error");
       try {
-        await apiFetch(`/tenant/${currentTenantId}/notice`, { method: "POST" });
+        await apiFetch(`/tenant/${currentTenantId}/notice`, {
+          method: "POST",
+          body: { notice_period_days: 30 },
+        });
         showMessage("tenantMessage", "Notice sent successfully.");
       } catch (err) {
         showMessage("tenantMessage", err.message, "error");
@@ -727,6 +800,58 @@ async function initTenant() {
   });
 
   document.getElementById("logoutButton")?.addEventListener("click", logout);
+}
+
+async function initTenantProfile() {
+  const tenantInfo = document.getElementById("tenantInfo");
+  const tenantPayments = document.getElementById("tenantPayments");
+  const message = document.getElementById("tenantMessage");
+  const updateForm = document.getElementById("tenantProfileForm");
+
+  async function loadProfile() {
+    try {
+      const tenant = await apiFetch("/tenant/me");
+      tenantInfo.innerHTML = `
+        <p><strong>${tenant.first_name} ${tenant.last_name}</strong></p>
+        <p><strong>Phone:</strong> ${tenant.phone}</p>
+        <p><strong>Status:</strong> ${tenant.status || "pending"}</p>
+        <p><strong>PG ID:</strong> ${tenant.pg_id || "N/A"}</p>
+        <p><strong>Room ID:</strong> ${tenant.room_id || "not assigned"}</p>
+        <p><strong>Joining Date:</strong> ${tenant.joining_date || "N/A"}</p>
+      `;
+      const payments = await apiFetch(`/tenant/${tenant.id}/payments`);
+      tenantPayments.innerHTML = payments.length
+        ? payments
+            .map(
+              (p) =>
+                `<div class="item-card"><strong>${p.month || p.method}</strong> • ${p.amount} • ${p.status}</div>`,
+            )
+            .join("")
+        : "<p>No payments found.</p>";
+    } catch (err) {
+      message.textContent = err.message;
+    }
+  }
+
+  updateForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {
+      first_name: updateForm.first_name.value,
+      last_name: updateForm.last_name.value,
+      phone: updateForm.phone.value,
+      id_proof_type: updateForm.id_proof_type.value,
+    };
+    try {
+      await apiFetch("/tenant/me", { method: "PUT", body: payload });
+      showMessage("tenantMessage", "Profile updated successfully.");
+      await loadProfile();
+    } catch (err) {
+      showMessage("tenantMessage", err.message, "error");
+    }
+  });
+
+  document.getElementById("logoutButton")?.addEventListener("click", logout);
+  await loadProfile();
 }
 
 async function initAdmin() {

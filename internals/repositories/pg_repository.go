@@ -17,6 +17,7 @@ type PGRepository interface {
 	DeletePG(ctx context.Context, id uuid.UUID) error
 	GetPGStatistics(ctx context.Context, id uuid.UUID) (map[string]int64, error)
 	GetAllPGs(ctx context.Context, limit int, offset int) ([]models.PG, error)
+	GetAllPGsWithDetails(ctx context.Context, limit int, offset int) ([]models.PG, error)
 }
 
 type pgRepository struct {
@@ -79,5 +80,16 @@ func (r *pgRepository) GetPGStatistics(ctx context.Context, id uuid.UUID) (map[s
 func (r *pgRepository) GetAllPGs(ctx context.Context, limit int, offset int) ([]models.PG, error) {
 	var pgs []models.PG
 	err := r.db.WithContext(ctx).Limit(limit).Offset(offset).Find(&pgs).Error
+	return pgs, err
+}
+
+func (r *pgRepository) GetAllPGsWithDetails(ctx context.Context, limit int, offset int) ([]models.PG, error) {
+	var pgs []models.PG
+	err := r.db.WithContext(ctx).
+		Preload("Rooms").
+		Preload("Tenants").
+		Limit(limit).
+		Offset(offset).
+		Find(&pgs).Error
 	return pgs, err
 }

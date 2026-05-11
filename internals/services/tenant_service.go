@@ -16,11 +16,13 @@ type TenantService interface {
 	CreateTenant(ctx context.Context, tenant *models.Tenant) error
 	GetTenantByID(ctx context.Context, id uuid.UUID) (*models.Tenant, error)
 	GetTenantByUserID(ctx context.Context, userID uuid.UUID) (*models.Tenant, error)
+	GetTenantByUserIDAndPG(ctx context.Context, userID, pgID uuid.UUID) (*models.Tenant, error)
 	GetTenantByDocumentURL(ctx context.Context, documentURL string) (*models.Tenant, error)
 	GetTenantsByPG(ctx context.Context, pgID uuid.UUID) ([]models.Tenant, error)
 	UpdateTenant(ctx context.Context, tenant *models.Tenant) error
 	UpdateProfilePhoto(ctx context.Context, tenantID uuid.UUID, photoURL string) error
 	ApproveTenant(ctx context.Context, tenantID uuid.UUID, roomID uuid.UUID) error
+	RejectTenant(ctx context.Context, tenantID uuid.UUID) error
 
 	// Notice Period & Exit Management
 	InitiateNotice(ctx context.Context, tenantID uuid.UUID, noticePeriodDays int) error
@@ -138,6 +140,20 @@ func (s *tenantService) GetTenantByUserID(ctx context.Context, userID uuid.UUID)
 	if err != nil {
 		s.logger.Error("Failed to get tenant by user", "error", err, "user_id", userID)
 		return nil, errors.New("tenant not found for user")
+	}
+
+	return tenant, nil
+}
+
+func (s *tenantService) GetTenantByUserIDAndPG(ctx context.Context, userID, pgID uuid.UUID) (*models.Tenant, error) {
+	if userID == uuid.Nil || pgID == uuid.Nil {
+		return nil, errors.New("invalid user or PG ID")
+	}
+
+	tenant, err := s.tenantRepo.GetTenantByUserIDAndPG(ctx, userID, pgID)
+	if err != nil {
+		s.logger.Error("Failed to get tenant by user and PG", "error", err, "user_id", userID, "pg_id", pgID)
+		return nil, err
 	}
 
 	return tenant, nil
@@ -263,6 +279,33 @@ func (s *tenantService) ApproveTenant(ctx context.Context, tenantID uuid.UUID, r
 	}
 
 	s.logger.Info("Tenant approved and room assigned", "tenant_id", tenantID, "room_id", roomID)
+	return nil
+}
+
+func (s *tenantService) RejectTenant(ctx context.Context, tenantID uuid.UUID) error {
+	if tenantID == uuid.Nil {
+		return errors.New("invalid tenant ID")
+	}
+
+	tenant, err := s.tenantRepo.GetTenantByID(ctx, tenantID)
+	if err != nil {
+		s.logger.Error("Failed to get tenant", "error", err, "tenant_id", tenantID)
+		return errors.New("tenant not found")
+	}
+
+	if tenant.Status != "pending_approval" {
+		return errors.New("only pending tenant requests can be rejected")
+	}
+
+	tenant.Status = "rejected"
+	tenant.IsActive = false
+
+	if err := s.tenantRepo.UpdateTenant(ctx, tenant); err != nil {
+		s.logger.Error("Failed to reject tenant", "error", err, "tenant_id", tenantID)
+		return errors.New("failed to reject tenant")
+	}
+
+	s.logger.Info("Tenant request rejected", "tenant_id", tenantID)
 	return nil
 }
 

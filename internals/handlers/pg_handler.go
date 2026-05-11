@@ -246,7 +246,7 @@ func (h *PGHandler) ListAllPGs(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 
-	pgs, err := h.pgService.GetAllPGs(c.Request.Context(), limit, offset)
+	pgs, err := h.pgService.GetAllPGsWithDetails(c.Request.Context(), limit, offset)
 	if err != nil {
 		h.logger.Error("Failed to list PGs", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

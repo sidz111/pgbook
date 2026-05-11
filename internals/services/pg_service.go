@@ -22,6 +22,7 @@ type PGService interface {
 
 	// PG Management
 	GetAllPGs(ctx context.Context, limit int, offset int) ([]models.PG, error)
+	GetAllPGsWithDetails(ctx context.Context, limit int, offset int) ([]models.PG, error)
 	GetPGStatistics(ctx context.Context, pgID uuid.UUID) (map[string]interface{}, error)
 	GetDashboardData(ctx context.Context, pgID uuid.UUID) (map[string]interface{}, error)
 
@@ -201,6 +202,23 @@ func (s *pgService) GetAllPGs(ctx context.Context, limit int, offset int) ([]mod
 	pgs, err := s.pgRepo.GetAllPGs(ctx, limit, offset)
 	if err != nil {
 		s.logger.Error("Failed to get all PGs", "error", err)
+		return nil, errors.New("failed to fetch PGs")
+	}
+
+	return pgs, nil
+}
+
+func (s *pgService) GetAllPGsWithDetails(ctx context.Context, limit int, offset int) ([]models.PG, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 10
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	pgs, err := s.pgRepo.GetAllPGsWithDetails(ctx, limit, offset)
+	if err != nil {
+		s.logger.Error("Failed to get all PGs with details", "error", err)
 		return nil, errors.New("failed to fetch PGs")
 	}
 

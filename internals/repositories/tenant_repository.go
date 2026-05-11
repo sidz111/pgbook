@@ -13,6 +13,7 @@ type TenantRepository interface {
 	CreateTenant(ctx context.Context, tenant *models.Tenant) error
 	GetTenantByID(ctx context.Context, id uuid.UUID) (*models.Tenant, error)
 	GetTenantByUserID(ctx context.Context, userID uuid.UUID) (*models.Tenant, error)
+	GetTenantByUserIDAndPG(ctx context.Context, userID, pgID uuid.UUID) (*models.Tenant, error)
 	GetTenantsByPGID(ctx context.Context, pgID uuid.UUID) ([]models.Tenant, error)
 	UpdateTenant(ctx context.Context, tenant *models.Tenant) error
 	UpdateProfilePhoto(ctx context.Context, id uuid.UUID, photoURL string) error
@@ -42,9 +43,13 @@ func (r *tenantRepository) CreateTenant(ctx context.Context, tenant *models.Tena
 			return err
 		}
 
-		// 2. Room table occupied count +1
-		return tx.Model(&models.Room{}).Where("id = ?", tenant.RoomID).
-			UpdateColumn("occupied", gorm.Expr("occupied + ?", 1)).Error
+		// 2. If tenant was assigned to a room, update occupancy count.
+		if tenant.RoomID != nil && *tenant.RoomID != uuid.Nil {
+			return tx.Model(&models.Room{}).Where("id = ?", tenant.RoomID).
+				UpdateColumn("occupied", gorm.Expr("occupied + ?", 1)).Error
+		}
+
+		return nil
 	})
 }
 
@@ -58,6 +63,12 @@ func (r *tenantRepository) GetTenantByID(ctx context.Context, id uuid.UUID) (*mo
 func (r *tenantRepository) GetTenantByUserID(ctx context.Context, userID uuid.UUID) (*models.Tenant, error) {
 	var tenant models.Tenant
 	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&tenant).Error
+	return &tenant, err
+}
+
+func (r *tenantRepository) GetTenantByUserIDAndPG(ctx context.Context, userID, pgID uuid.UUID) (*models.Tenant, error) {
+	var tenant models.Tenant
+	err := r.db.WithContext(ctx).Where("user_id = ? AND pg_id = ?", userID, pgID).First(&tenant).Error
 	return &tenant, err
 }
 
