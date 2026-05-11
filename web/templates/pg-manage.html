@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PGBook | PG Owner</title>
+    <title>PGBook | Manage PG</title>
     <link rel="stylesheet" href="/static/css/styles.css" />
   </head>
   <body>
@@ -12,29 +12,24 @@
       <nav class="nav">
         <a href="/">Home</a>
         <a href="/dashboard">Dashboard</a>
-        <a href="/owner">Owner</a>
+        <a href="/owner">Owner Dashboard</a>
+        <a href="/pg-manage">Manage PG</a>
         <button id="logoutButton" class="btn btn-secondary">Logout</button>
       </nav>
     </header>
 
     <main class="container">
       <section class="panel">
-        <h1>PG Owner Console</h1>
-        <div id="ownerMessage" class="message"></div>
-      </section>
-
-      <section class="grid-layout">
-        <article class="panel">
-          <h2>My PG</h2>
-          <div id="pgInfo"></div>
-        </article>
-        <article class="panel">
-          <h2>Statistics</h2>
-          <div id="statsInfo"></div>
-        </article>
+        <h1>Manage PG</h1>
+        <div id="pgMessage" class="message"></div>
       </section>
 
       <section class="panel">
+        <h2>Current PG Information</h2>
+        <div id="pgInfo"></div>
+      </section>
+
+      <section class="panel form-panel">
         <h2>Create or Update PG</h2>
         <form id="createPGForm" class="form-grid">
           <label for="pgName">PG Name</label>
@@ -65,6 +60,7 @@
             name="rent_amount"
             type="number"
             min="1"
+            step="0.01"
             required
           />
           <label for="capacity">Capacity</label>
@@ -72,52 +68,10 @@
           <button type="submit" class="btn btn-primary">Add Room</button>
         </form>
       </section>
-
-      <section class="panel">
-        <h2>Tenant Requests</h2>
-        <div id="tenantRequests"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Tenants</h2>
-
-        <div id="tenantList"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Pending Payments</h2>
-        <div id="pendingPayments"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Subscription</h2>
-        <div id="subscriptionInfo"></div>
-        <form id="createSubscriptionForm" class="form-grid">
-          <label for="amount">Payment Amount</label>
-          <input
-            id="amount"
-            name="amount"
-            type="number"
-            min="1"
-            step="0.01"
-            required
-          />
-          <label for="proofUrl">Payment Proof (Screenshot URL or Path)</label>
-          <input id="proofUrl" name="proof_url" required />
-          <label for="planName">Plan Name</label>
-          <input id="planName" name="plan_name" placeholder="e.g., Monthly" />
-          <button type="submit" class="btn btn-primary">
-            Request Subscription
-          </button>
-        </form>
-      </section>
     </main>
 
     <footer class="footer">
-      <p>
-        Owner dashboard with PG, room, tenant, payment and subscription
-        controls.
-      </p>
+      <p>Create, update, and manage your PG properties and rooms.</p>
     </footer>
     <script src="/static/js/app.js"></script>
   </body>

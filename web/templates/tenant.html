@@ -25,7 +25,11 @@
 
       <section class="panel form-panel">
         <h2>Register as Tenant</h2>
-        <form id="tenantRegisterForm" class="form-grid">
+        <form
+          id="tenantRegisterForm"
+          class="form-grid"
+          enctype="multipart/form-data"
+        >
           <label for="pgId">Select PG</label>
           <select id="pgId" name="pg_id" required>
             <option value="">-- Choose a PG --</option>
@@ -39,22 +43,22 @@
           <label for="joiningDate">Joining Date</label>
           <input id="joiningDate" name="joining_date" type="date" />
           <label for="idProofType">ID Proof Type</label>
-          <select id="idProofType" name="id_proof_type">
+          <select id="idProofType" name="id_proof_type" required>
+            <option value="">-- Select ID Type --</option>
             <option value="Aadhaar">Aadhaar</option>
             <option value="PAN">PAN</option>
             <option value="Passport">Passport</option>
             <option value="Driving License">Driving License</option>
           </select>
+          <label for="idProof">Upload ID Proof</label>
+          <input
+            id="idProof"
+            type="file"
+            name="id_proof"
+            accept="image/*,application/pdf"
+            required
+          />
           <button type="submit" class="btn btn-primary">Register</button>
-        </form>
-      </section>
-
-      <section class="panel form-panel">
-        <h2>Load Tenant Profile</h2>
-        <form id="tenantLookupForm" class="form-grid">
-          <label for="tenantId">Tenant ID</label>
-          <input id="tenantId" name="tenant_id" required />
-          <button type="submit" class="btn btn-primary">Load Tenant</button>
         </form>
       </section>
 

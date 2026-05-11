@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PGBook | Owner Profile</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">PGBook</div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/owner">Owner Dashboard</a>
+        <a href="/owner-profile">Profile</a>
+        <button id="logoutButton" class="btn btn-secondary">Logout</button>
+      </nav>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <h1>Owner Profile</h1>
+        <div id="profileMessage" class="message"></div>
+      </section>
+
+      <section class="panel">
+        <h2>My Profile Information</h2>
+        <div id="profileInfo"></div>
+      </section>
+
+      <section class="panel form-panel">
+        <h2>Update Profile</h2>
+        <form id="updateProfileForm" class="form-grid">
+          <label for="ownerName">Owner Name</label>
+          <input id="ownerName" name="owner_name" required />
+          <label for="phone">Phone</label>
+          <input id="phone" name="phone" required />
+          <label for="address">Address</label>
+          <textarea id="address" name="address" required></textarea>
+          <label for="pgName">PG Name</label>
+          <input id="pgName" name="name" required />
+          <button type="submit" class="btn btn-primary">Update Profile</button>
+        </form>
+      </section>
+
+      <section class="panel form-panel">
+        <h2>Upload Owner Photo</h2>
+        <form
+          id="uploadPhotoForm"
+          class="form-grid"
+          enctype="multipart/form-data"
+        >
+          <input
+            id="photoFile"
+            type="file"
+            name="photo"
+            accept="image/*"
+            required
+          />
+          <button type="submit" class="btn btn-primary">Upload Photo</button>
+        </form>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Manage your profile and personal information here.</p>
+    </footer>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

@@ -107,7 +107,7 @@ func RegisterRoutes(
 			subscriptions := pg.Group("/:pg_id/subscription")
 			{
 				subscriptions.POST("", authHandler.checkOwnerOrAdmin(subscriptionHandler.CreateSubscription))
-				subscriptions.GET("/:pg_id/active", subscriptionHandler.GetActiveSubscription)
+				subscriptions.GET("/active", subscriptionHandler.GetActiveSubscription)
 				subscriptions.GET("/history", authHandler.checkOwnerOrAdmin(subscriptionHandler.GetSubscriptionsByPG))
 			}
 

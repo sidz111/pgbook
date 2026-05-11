@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PGBook | Tenant Requests</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">PGBook</div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/owner">Owner Dashboard</a>
+        <a href="/tenant-requests">Tenant Requests</a>
+        <button id="logoutButton" class="btn btn-secondary">Logout</button>
+      </nav>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <h1>Pending Tenant Requests</h1>
+        <div id="requestMessage" class="message"></div>
+      </section>
+
+      <section class="panel">
+        <h2>PG Selection</h2>
+        <div id="pgSelector"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Pending Tenant Requests</h2>
+        <div id="tenantRequests"></div>
+      </section>
+
+      <section class="panel">
+        <h2>All Tenants (Approved)</h2>
+        <div id="allTenants"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Review and manage pending tenant requests for your PG.</p>
+    </footer>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

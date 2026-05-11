@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PGBook | My Profile</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">PGBook</div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/tenant">Tenant</a>
+        <a href="/tenant-profile">My Profile</a>
+        <button id="logoutButton" class="btn btn-secondary">Logout</button>
+      </nav>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <h1>My Profile</h1>
+        <div id="tenantMessage" class="message"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Profile Information</h2>
+        <div id="tenantInfo"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Payment History</h2>
+        <div id="tenantPayments"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Notice and Documents</h2>
+        <div class="notice-actions">
+          <button id="sendNoticeBtn" class="btn btn-primary">
+            Send Notice
+          </button>
+          <button id="cancelNoticeBtn" class="btn btn-secondary">
+            Cancel Notice
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>View your profile information and payment history.</p>
+    </footer>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

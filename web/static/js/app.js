@@ -275,10 +275,19 @@ async function initOwner() {
   async function loadSubscription() {
     if (!currentPGId) return;
     try {
-      const data = await apiFetch(`/pg/${currentPGId}/subscription/active`);
-      document.getElementById("subscriptionInfo").innerHTML = data.active
-        ? `<p>Active subscription: ${data.details || "active"}</p>`
-        : "<p>No active subscription.</p>";
+      const subscription = await apiFetch(
+        `/pg/${currentPGId}/subscription/active`,
+      );
+      if (subscription && subscription.status === "active") {
+        document.getElementById("subscriptionInfo").innerHTML = `
+          <p><strong>Plan:</strong> ${subscription.plan_name || "Monthly"}</p>
+          <p><strong>Amount:</strong> ${subscription.amount || 0}</p>
+          <p><strong>Expiry:</strong> ${subscription.expiry_date || "N/A"}</p>
+        `;
+      } else {
+        document.getElementById("subscriptionInfo").innerHTML =
+          "<p>No active subscription.</p>";
+      }
     } catch (err) {
       document.getElementById("subscriptionInfo").innerHTML =
         `<p>${err.message}</p>`;
@@ -333,8 +342,10 @@ async function initOwner() {
       event.preventDefault();
       if (!currentPGId) return;
       const payload = {
-        subscription_type: event.target.subscription_type.value,
-        duration_months: Number(event.target.duration_months.value),
+        pg_id: currentPGId,
+        amount: Number(event.target.amount.value),
+        proof_url: event.target.proof_url.value,
+        plan_name: event.target.plan_name.value || "Monthly",
       };
       try {
         await apiFetch(`/pg/${currentPGId}/subscription`, {
@@ -342,6 +353,7 @@ async function initOwner() {
           body: payload,
         });
         showMessage("ownerMessage", "Subscription requested successfully.");
+        event.target.reset();
         await loadSubscription();
       } catch (err) {
         showMessage("ownerMessage", err.message, "error");
@@ -555,22 +567,26 @@ async function initAdmin() {
   async function loadPendingSubscriptions() {
     try {
       const data = await apiFetch("/subscription/pending");
-      document.getElementById("pendingSubscriptions").innerHTML = data.length
-        ? data
-            .map(
-              (sub) => `
+      const subscriptions = data.subscriptions || data || [];
+      document.getElementById("pendingSubscriptions").innerHTML =
+        subscriptions.length
+          ? subscriptions
+              .map(
+                (sub) => `
           <div class="item-card">
             <p><strong>${sub.id}</strong> • PG ${sub.pg_id}</p>
-            <p>Type: ${sub.subscription_type} • Duration: ${sub.duration_months}</p>
+            <p>Plan: ${sub.plan_name || "N/A"} • Amount: ${sub.amount || 0}</p>
+            <p>Status: ${sub.status || "pending"}</p>
+            <p>Start: ${sub.start_date || "unknown"} • Expiry: ${sub.expiry_date || "pending"}</p>
             <div class="button-row">
               <button class="btn btn-primary" onclick="approveSubscription('${sub.id}')">Approve</button>
               <button class="btn btn-secondary" onclick="rejectSubscription('${sub.id}')">Reject</button>
             </div>
           </div>
         `,
-            )
-            .join("")
-        : "<p>No pending subscriptions.</p>";
+              )
+              .join("")
+          : "<p>No pending subscriptions.</p>";
     } catch (err) {
       document.getElementById("pendingSubscriptions").innerHTML =
         `<p>${err.message}</p>`;
@@ -579,7 +595,10 @@ async function initAdmin() {
 
   window.approveSubscription = async (subId) => {
     try {
-      await apiFetch(`/subscription/${subId}/approve`, { method: "POST" });
+      await apiFetch(`/subscription/${subId}/approve`, {
+        method: "POST",
+        body: { months: 1 },
+      });
       showMessage("adminMessage", "Subscription approved.");
       await loadPendingSubscriptions();
     } catch (err) {

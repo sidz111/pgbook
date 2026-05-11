@@ -97,8 +97,20 @@ func main() {
 	r.GET("/owner", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "owner.html", gin.H{"Page": "owner"})
 	})
+	r.GET("/owner-profile", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "owner-profile.html", gin.H{"Page": "owner-profile"})
+	})
+	r.GET("/pg-manage", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "pg-manage.html", gin.H{"Page": "pg-manage"})
+	})
+	r.GET("/tenant-requests", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "tenant-requests.html", gin.H{"Page": "tenant-requests"})
+	})
 	r.GET("/tenant", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "tenant.html", gin.H{"Page": "tenant"})
+	})
+	r.GET("/tenant-profile", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "tenant-profile.html", gin.H{"Page": "tenant-profile"})
 	})
 	r.GET("/admin", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "admin.html", gin.H{"Page": "admin"})

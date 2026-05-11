@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -32,7 +34,7 @@ type CreateSubscriptionRequest struct {
 }
 
 type ApproveSubscriptionRequest struct {
-	Months int `json:"months" binding:"required,gt=0"`
+	Months int `json:"months" binding:"omitempty,gt=0"`
 }
 
 func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
@@ -99,8 +101,14 @@ func (h *SubscriptionHandler) ApproveSubscription(c *gin.Context) {
 
 	var req ApproveSubscriptionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+		if !errors.Is(err, io.EOF) {
+			h.logger.Error("Subscription approve binding error", "error", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	if req.Months <= 0 {
+		req.Months = 1
 	}
 
 	userID, _, err := getAuthUser(c)
