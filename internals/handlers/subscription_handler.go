@@ -5,23 +5,28 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sidz111/pgbook/internals/models"
 	"github.com/sidz111/pgbook/internals/services"
+	"github.com/sidz111/pgbook/internals/utils"
 )
 
 type SubscriptionHandler struct {
 	subscriptionService services.SubscriptionService
 	pgService           services.PGService
+	fileUploadService   *utils.FileUploadService
 	logger              *slog.Logger
 }
 
-func NewSubscriptionHandler(subscriptionService services.SubscriptionService, pgService services.PGService) *SubscriptionHandler {
+func NewSubscriptionHandler(subscriptionService services.SubscriptionService, pgService services.PGService, fileUploadService *utils.FileUploadService) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		subscriptionService: subscriptionService,
 		pgService:           pgService,
+		fileUploadService:   fileUploadService,
 		logger:              slog.Default(),
 	}
 }
@@ -39,16 +44,46 @@ type ApproveSubscriptionRequest struct {
 
 func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	var req CreateSubscriptionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		h.logger.Error("Subscription binding error", "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "validation failed: " + err.Error(),
-			"details": map[string]interface{}{
-				"required_fields":             []string{"pg_id", "amount", "proof_url"},
-				"amount_must_be_greater_than": 0,
-			},
-		})
-		return
+	proofURL := ""
+
+	if strings.Contains(c.GetHeader("Content-Type"), "multipart/form-data") {
+		if file, err := c.FormFile("proof"); err == nil {
+			uploadedURL, err := h.fileUploadService.UploadTenantDocument(file, "subscription_proof")
+			if err != nil {
+				h.logger.Error("Failed to upload subscription proof", "error", err)
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			proofURL = uploadedURL
+		}
+		req.PGID = c.PostForm("pg_id")
+		req.PlanName = c.PostForm("plan_name")
+		req.ProofURL = c.PostForm("proof_url")
+		amountStr := c.PostForm("amount")
+		if amountStr != "" {
+			amount, err := strconv.ParseFloat(amountStr, 64)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid amount format"})
+				return
+			}
+			req.Amount = amount
+		}
+	} else {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			h.logger.Error("Subscription binding error", "error", err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "validation failed: " + err.Error(),
+				"details": map[string]interface{}{
+					"required_fields":             []string{"pg_id", "amount", "proof_url"},
+					"amount_must_be_greater_than": 0,
+				},
+			})
+			return
+		}
+	}
+
+	if proofURL == "" {
+		proofURL = req.ProofURL
 	}
 
 	// Additional validation
@@ -60,10 +95,11 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "amount must be greater than 0"})
 		return
 	}
-	if req.ProofURL == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "proof_url (payment screenshot URL) is required"})
+	if proofURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "proof_url (payment screenshot URL) or proof file is required"})
 		return
 	}
+	req.ProofURL = proofURL
 
 	pgID, err := uuid.Parse(req.PGID)
 	if err != nil {

@@ -35,42 +35,16 @@
       </section>
 
       <section class="panel">
-        <h2>Create or Update PG</h2>
-        <form id="createPGForm" class="form-grid">
-          <label for="pgName">PG Name</label>
-          <input id="pgName" name="name" required />
-          <label for="ownerName">Owner Name</label>
-          <input id="ownerName" name="owner_name" required />
-          <label for="pgAddress">Address</label>
-          <input id="pgAddress" name="address" required />
-          <label for="pgPhone">Phone</label>
-          <input id="pgPhone" name="phone" required />
-          <button type="submit" class="btn btn-primary">
-            Create / Update PG
-          </button>
-        </form>
+        <h2>PG Management</h2>
+        <div class="button-row">
+          <a class="btn btn-primary" href="/pg-manage">Create or Update PG</a>
+          <a class="btn btn-secondary" href="/room-manage">Add New Room</a>
+        </div>
       </section>
 
       <section class="panel">
         <h2>Rooms</h2>
         <div id="roomList"></div>
-        <form id="createRoomForm" class="form-grid">
-          <label for="roomNumber">Room Number</label>
-          <input id="roomNumber" name="room_number" required />
-          <label for="sharingType">Sharing Type</label>
-          <input id="sharingType" name="sharing_type" required />
-          <label for="rentAmount">Rent Amount</label>
-          <input
-            id="rentAmount"
-            name="rent_amount"
-            type="number"
-            min="1"
-            required
-          />
-          <label for="capacity">Capacity</label>
-          <input id="capacity" name="capacity" type="number" min="1" required />
-          <button type="submit" class="btn btn-primary">Add Room</button>
-        </form>
       </section>
 
       <section class="panel">
@@ -92,7 +66,11 @@
       <section class="panel">
         <h2>Subscription</h2>
         <div id="subscriptionInfo"></div>
-        <form id="createSubscriptionForm" class="form-grid">
+        <form
+          id="createSubscriptionForm"
+          class="form-grid"
+          enctype="multipart/form-data"
+        >
           <label for="amount">Payment Amount</label>
           <input
             id="amount"
@@ -102,8 +80,10 @@
             step="0.01"
             required
           />
-          <label for="proofUrl">Payment Proof (Screenshot URL or Path)</label>
-          <input id="proofUrl" name="proof_url" required />
+          <label for="proofFile">Payment Screenshot</label>
+          <input id="proofFile" type="file" name="proof" accept="image/*" />
+          <label for="proofUrl">Payment Proof URL (optional)</label>
+          <input id="proofUrl" name="proof_url" />
           <label for="planName">Plan Name</label>
           <input id="planName" name="plan_name" placeholder="e.g., Monthly" />
           <button type="submit" class="btn btn-primary">

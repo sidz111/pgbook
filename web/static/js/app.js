@@ -141,7 +141,8 @@ async function initOwner() {
   async function loadRooms() {
     if (!currentPGId) return;
     try {
-      const rooms = await apiFetch(`/pg/${currentPGId}/rooms`);
+      const data = await apiFetch(`/pg/${currentPGId}/rooms`);
+      const rooms = data.rooms || data || [];
       document.getElementById("roomList").innerHTML = rooms.length
         ? rooms
             .map(
@@ -158,7 +159,8 @@ async function initOwner() {
   async function loadTenants() {
     if (!currentPGId) return;
     try {
-      const tenants = await apiFetch(`/pg/${currentPGId}/tenants`);
+      const data = await apiFetch(`/pg/${currentPGId}/tenants`);
+      const tenants = data.tenants || data || [];
       document.getElementById("tenantList").innerHTML = tenants.length
         ? tenants
             .map(
@@ -175,7 +177,8 @@ async function initOwner() {
   async function loadTenantRequests() {
     if (!currentPGId) return;
     try {
-      const tenants = await apiFetch(`/pg/${currentPGId}/tenants`);
+      const data = await apiFetch(`/pg/${currentPGId}/tenants`);
+      const tenants = data.tenants || data || [];
       const pendingRequests = tenants.filter(
         (t) => t.status === "pending_approval",
       );
@@ -199,8 +202,11 @@ async function initOwner() {
           : "<p>No pending tenant requests.</p>";
 
       // Load available rooms for approval forms
-      const rooms = await apiFetch(`/pg/${currentPGId}/rooms`);
-      const availableRooms = rooms.filter((r) => r.occupied < r.capacity);
+      const roomsData = await apiFetch(`/pg/${currentPGId}/rooms`);
+      const rooms = roomsData.rooms || roomsData || [];
+      const availableRooms = rooms.filter(
+        (r) => (r.occupied || 0) < (r.capacity || 0),
+      );
       document
         .querySelectorAll('.approve-form select[name="room_id"]')
         .forEach((select) => {
@@ -244,9 +250,9 @@ async function initOwner() {
     if (!currentPGId) return;
     try {
       const data = await apiFetch(`/pg/${currentPGId}/payments/pending`);
-      document.getElementById("pendingPayments").innerHTML = data
-        .pending_payments.length
-        ? data.pending_payments
+      const payments = data?.pending_payments || [];
+      document.getElementById("pendingPayments").innerHTML = payments.length
+        ? payments
             .map(
               (p) =>
                 `<div class="item-card"><strong>${p.id}</strong> • ${p.amount} ${p.method} • ${p.status}</div>`,
@@ -294,74 +300,253 @@ async function initOwner() {
     }
   }
 
-  document
-    .getElementById("createPGForm")
-    .addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const payload = {
-        name: event.target.name.value,
-        owner_name: event.target.owner_name.value,
-        phone: event.target.phone.value,
-        address: event.target.address.value,
-      };
-      try {
-        await apiFetch("/pg/create", { method: "POST", body: payload });
-        showMessage("ownerMessage", "PG created successfully. Refreshing...");
-        await loadOwnerSummary();
-      } catch (err) {
-        showMessage("ownerMessage", err.message, "error");
-      }
-    });
+  const subscriptionForm = document.getElementById("createSubscriptionForm");
+  subscriptionForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentPGId) return;
 
-  document
-    .getElementById("createRoomForm")
-    .addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (!currentPGId) return;
-      const payload = {
-        room_number: event.target.room_number.value,
-        capacity: Number(event.target.capacity.value),
-        rent_amount: Number(event.target.rent_amount.value),
-        sharing_type: event.target.sharing_type.value,
-      };
-      try {
-        await apiFetch(`/pg/${currentPGId}/rooms/create`, {
-          method: "POST",
-          body: payload,
-        });
-        showMessage("ownerMessage", "Room added successfully.");
-        await loadRooms();
-      } catch (err) {
-        showMessage("ownerMessage", err.message, "error");
-      }
-    });
+    const proofFile = document.getElementById("proofFile")?.files?.[0];
+    let body;
+    let formData = false;
 
-  document
-    .getElementById("createSubscriptionForm")
-    .addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (!currentPGId) return;
-      const payload = {
+    if (proofFile) {
+      body = new FormData();
+      body.append("pg_id", currentPGId);
+      body.append("amount", event.target.amount.value);
+      body.append("plan_name", event.target.plan_name.value || "Monthly");
+      body.append("proof", proofFile);
+      if (event.target.proof_url.value) {
+        body.append("proof_url", event.target.proof_url.value);
+      }
+      formData = true;
+    } else {
+      body = {
         pg_id: currentPGId,
         amount: Number(event.target.amount.value),
         proof_url: event.target.proof_url.value,
         plan_name: event.target.plan_name.value || "Monthly",
       };
-      try {
-        await apiFetch(`/pg/${currentPGId}/subscription`, {
-          method: "POST",
-          body: payload,
-        });
-        showMessage("ownerMessage", "Subscription requested successfully.");
-        event.target.reset();
-        await loadSubscription();
-      } catch (err) {
-        showMessage("ownerMessage", err.message, "error");
-      }
-    });
+    }
+
+    try {
+      await apiFetch(`/pg/${currentPGId}/subscription`, {
+        method: "POST",
+        body,
+        formData,
+      });
+      showMessage("ownerMessage", "Subscription requested successfully.");
+      subscriptionForm.reset();
+      await loadSubscription();
+    } catch (err) {
+      showMessage("ownerMessage", err.message, "error");
+    }
+  });
 
   document.getElementById("logoutButton").addEventListener("click", logout);
   await loadOwnerSummary();
+}
+
+async function initPGManage() {
+  const message = document.getElementById("pgMessage");
+  const form = document.getElementById("createPGForm");
+  let currentPG = null;
+
+  async function loadPG() {
+    try {
+      const pg = await apiFetch("/pg/my-pg");
+      currentPG = pg;
+      form.name.value = pg.name || "";
+      form.owner_name.value = pg.owner_name || "";
+      form.phone.value = pg.phone || "";
+      form.address.value = pg.address || "";
+      form.querySelector("button[type=submit]").textContent = pg.id
+        ? "Update PG"
+        : "Save PG";
+      message.textContent = "";
+    } catch (err) {
+      currentPG = null;
+      if (form) {
+        form.reset();
+        form.querySelector("button[type=submit]").textContent = "Create PG";
+      }
+      showMessage(
+        "pgMessage",
+        "No existing PG found. Fill the form to create one.",
+      );
+    }
+  }
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {
+      name: form.name.value,
+      owner_name: form.owner_name.value,
+      phone: form.phone.value,
+      address: form.address.value,
+    };
+    const path =
+      currentPG && currentPG.id ? `/pg/${currentPG.id}` : "/pg/create";
+    const method = currentPG && currentPG.id ? "PUT" : "POST";
+    try {
+      await apiFetch(path, { method, body: payload });
+      showMessage("pgMessage", "PG saved successfully.");
+      await loadPG();
+    } catch (err) {
+      showMessage("pgMessage", err.message, "error");
+    }
+  });
+
+  document.getElementById("logoutButton").addEventListener("click", logout);
+  await loadPG();
+}
+
+async function initRoomManage() {
+  const message = document.getElementById("roomMessage");
+  const stats = document.getElementById("roomStats");
+  const roomList = document.getElementById("roomList");
+  const form = document.getElementById("createRoomForm");
+  let currentPGId = null;
+
+  async function loadRoomStats() {
+    if (!currentPGId) {
+      stats.innerHTML = "<p>Create a PG first to manage rooms.</p>";
+      roomList.innerHTML = "";
+      return;
+    }
+
+    try {
+      const data = await apiFetch(`/pg/${currentPGId}/rooms`);
+      const rooms = data.rooms || data || [];
+      const totalRooms = rooms.length;
+      const totalBeds = rooms.reduce(
+        (sum, room) => sum + Number(room.capacity || 0),
+        0,
+      );
+      const occupiedBeds = rooms.reduce(
+        (sum, room) => sum + Number(room.occupied || 0),
+        0,
+      );
+      const vacancies = Math.max(totalBeds - occupiedBeds, 0);
+
+      stats.innerHTML = `
+        <p><strong>Total Rooms:</strong> ${totalRooms}</p>
+        <p><strong>Total Bed Count:</strong> ${totalBeds}</p>
+        <p><strong>Vacancies:</strong> ${vacancies}</p>
+      `;
+      roomList.innerHTML = rooms.length
+        ? rooms
+            .map(
+              (room) =>
+                `<div class="item-card"><strong>${room.room_number}</strong> • ${room.sharing_type} • Capacity ${room.capacity} • Occupied ${room.occupied || 0}</div>`,
+            )
+            .join("")
+        : "<p>No rooms created yet.</p>";
+    } catch (err) {
+      stats.innerHTML = `<p>${err.message}</p>`;
+      roomList.innerHTML = "";
+    }
+  }
+
+  async function loadPG() {
+    try {
+      const pg = await apiFetch("/pg/my-pg");
+      currentPGId = pg.id;
+      message.textContent = "";
+      await loadRoomStats();
+    } catch (err) {
+      currentPGId = null;
+      showMessage("roomMessage", "No PG found. Create a PG first.", "error");
+      await loadRoomStats();
+    }
+  }
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentPGId) {
+      showMessage(
+        "roomMessage",
+        "Create a PG first before adding rooms.",
+        "error",
+      );
+      return;
+    }
+    const payload = {
+      room_number: form.room_number.value,
+      capacity: Number(form.capacity.value),
+      rent_amount: Number(form.rent_amount.value),
+      sharing_type: form.sharing_type.value,
+    };
+    try {
+      await apiFetch(`/pg/${currentPGId}/rooms/create`, {
+        method: "POST",
+        body: payload,
+      });
+      showMessage("roomMessage", "Room added successfully.");
+      form.reset();
+      await loadRoomStats();
+    } catch (err) {
+      showMessage("roomMessage", err.message, "error");
+    }
+  });
+
+  document.getElementById("logoutButton").addEventListener("click", logout);
+  await loadPG();
+}
+
+async function initTenantRequestsPage() {
+  const requestMessage = document.getElementById("requestMessage");
+  const tenantRequests = document.getElementById("tenantRequests");
+  const allTenants = document.getElementById("allTenants");
+  let currentPGId = null;
+
+  async function loadRequests() {
+    if (!currentPGId) return;
+    try {
+      const data = await apiFetch(`/pg/${currentPGId}/tenants`);
+      const tenants = data.tenants || data || [];
+      const pendingRequests = tenants.filter(
+        (t) => t.status === "pending_approval",
+      );
+      tenantRequests.innerHTML = pendingRequests.length
+        ? pendingRequests
+            .map(
+              (t) =>
+                `<div class="item-card"><strong>${t.first_name} ${t.last_name}</strong> • ${t.phone} • Status: ${t.status || "pending"}</div>`,
+            )
+            .join("")
+        : "<p>No pending tenant requests.</p>";
+      allTenants.innerHTML = tenants.length
+        ? tenants
+            .filter((t) => t.status !== "pending_approval")
+            .map(
+              (t) =>
+                `<div class="item-card"><strong>${t.first_name} ${t.last_name}</strong> • ${t.phone} • Status: ${t.status || "approved"}</div>`,
+            )
+            .join("")
+        : "<p>No approved tenants yet.</p>";
+    } catch (err) {
+      requestMessage.textContent = err.message;
+      tenantRequests.innerHTML = "";
+      allTenants.innerHTML = "";
+    }
+  }
+
+  async function loadPG() {
+    try {
+      const pg = await apiFetch("/pg/my-pg");
+      currentPGId = pg.id;
+      requestMessage.textContent = "";
+      await loadRequests();
+    } catch (err) {
+      currentPGId = null;
+      requestMessage.textContent = "No PG found. Please create a PG first.";
+      tenantRequests.innerHTML = "";
+      allTenants.innerHTML = "";
+    }
+  }
+
+  document.getElementById("logoutButton").addEventListener("click", logout);
+  await loadPG();
 }
 
 async function initTenant() {
@@ -626,6 +811,9 @@ function initPage() {
   if (path === "/register") return initRegister();
   if (path === "/dashboard") return initDashboard();
   if (path === "/owner") return initOwner();
+  if (path === "/pg-manage") return initPGManage();
+  if (path === "/room-manage") return initRoomManage();
+  if (path === "/tenant-requests") return initTenantRequestsPage();
   if (path === "/tenant") return initTenant();
   if (path === "/admin") return initAdmin();
   document.querySelectorAll("#logoutButton").forEach((button) => {

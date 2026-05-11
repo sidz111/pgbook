@@ -38,7 +38,7 @@ func RegisterRoutes(
 	roomHandler := NewRoomHandler(roomService, pgService)
 	tenantHandler := NewTenantHandler(tenantService, roomService, pgService, fileUploadService)
 	paymentHandler := NewPaymentHandler(paymentService, tenantService, pgService)
-	subscriptionHandler := NewSubscriptionHandler(subscriptionService, pgService)
+	subscriptionHandler := NewSubscriptionHandler(subscriptionService, pgService, fileUploadService)
 
 	// Public routes (no authentication)
 	public := router.Group("/v1")

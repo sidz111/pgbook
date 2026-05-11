@@ -103,6 +103,9 @@ func main() {
 	r.GET("/pg-manage", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "pg-manage.html", gin.H{"Page": "pg-manage"})
 	})
+	r.GET("/room-manage", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "room-manage.html", gin.H{"Page": "room-manage"})
+	})
 	r.GET("/tenant-requests", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "tenant-requests.html", gin.H{"Page": "tenant-requests"})
 	})

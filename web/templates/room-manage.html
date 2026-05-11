@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PGBook | Room Management</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">PGBook</div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/owner">Owner</a>
+        <a href="/pg-manage">PG Management</a>
+        <button id="logoutButton" class="btn btn-secondary">Logout</button>
+      </nav>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <h1>Room Management</h1>
+        <div id="roomMessage" class="message"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Room Summary</h2>
+        <div id="roomStats"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Existing Rooms</h2>
+        <div id="roomList"></div>
+      </section>
+
+      <section class="panel form-panel">
+        <h2>Add New Room</h2>
+        <form id="createRoomForm" class="form-grid">
+          <label for="roomNumber">Room Number</label>
+          <input id="roomNumber" name="room_number" required />
+          <label for="sharingType">Sharing Type</label>
+          <input id="sharingType" name="sharing_type" required />
+          <label for="rentAmount">Rent Amount</label>
+          <input
+            id="rentAmount"
+            name="rent_amount"
+            type="number"
+            min="1"
+            step="0.01"
+            required
+          />
+          <label for="capacity">Capacity</label>
+          <input id="capacity" name="capacity" type="number" min="1" required />
+          <button type="submit" class="btn btn-primary">Add Room</button>
+        </form>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Manage room creation and vacancy details on one page.</p>
+    </footer>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>
